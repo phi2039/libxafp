@@ -1,0 +1,398 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 45;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		83A86039142047E5000B8F90 /* Logging.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83A86037142047E5000B8F90 /* Logging.cpp */; };
+		83D4CEA3140AAE6000C157C2 /* AFPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */; };
+		83D4CEA4140AAE6000C157C2 /* DSIClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */; };
+		83D4CEA5140AAE6000C157C2 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
+		83D4CEA7140AAEB800C157C2 /* libafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libafp.cpp */; };
+		83D4CEB6140AAFB200C157C2 /* libafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libafp.cpp */; };
+		83D4CEB7140AAFB200C157C2 /* AFPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */; };
+		83D4CEB8140AAFB200C157C2 /* DSIClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */; };
+		83D4CEB9140AAFB200C157C2 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
+		83D4D47C1415596A00C157C2 /* Utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4D47B1415596A00C157C2 /* Utils.cpp */; };
+		8DD76F650486A84900D96B5E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7796FE84155DC02AAC07 /* main.cpp */; settings = {ATTRIBUTES = (); }; };
+		8DD76F6A0486A84900D96B5E /* libxafp.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = C6859E8B029090EE04C91782 /* libxafp.1 */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8DD76F690486A84900D96B5E /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 8;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+				8DD76F6A0486A84900D96B5E /* libxafp.1 in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		08FB7796FE84155DC02AAC07 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = ../test/main.cpp; sourceTree = "<group>"; };
+		83A85AE1141BCC00000B8F90 /* AFPProto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AFPProto.h; path = src/AFPProto.h; sourceTree = "<group>"; };
+		83A86036142047E5000B8F90 /* DSIProto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DSIProto.h; path = src/DSIProto.h; sourceTree = "<group>"; };
+		83A86037142047E5000B8F90 /* Logging.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Logging.cpp; path = src/Logging.cpp; sourceTree = "<group>"; };
+		83A86038142047E5000B8F90 /* Logging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Logging.h; path = src/Logging.h; sourceTree = "<group>"; };
+		83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AFPClient.cpp; path = src/AFPClient.cpp; sourceTree = "<group>"; };
+		83D4CE9D140AAE6000C157C2 /* AFPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AFPClient.h; path = src/AFPClient.h; sourceTree = "<group>"; };
+		83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DSIClient.cpp; path = src/DSIClient.cpp; sourceTree = "<group>"; };
+		83D4CE9F140AAE6000C157C2 /* DSIClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DSIClient.h; path = src/DSIClient.h; sourceTree = "<group>"; };
+		83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TCPClient.cpp; path = src/TCPClient.cpp; sourceTree = "<group>"; };
+		83D4CEA1140AAE6000C157C2 /* TCPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TCPClient.h; path = src/TCPClient.h; sourceTree = "<group>"; };
+		83D4CEA2140AAE6000C157C2 /* Utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Utils.h; path = src/Utils.h; sourceTree = "<group>"; };
+		83D4CEA6140AAEB800C157C2 /* libafp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = libafp.cpp; path = src/libafp.cpp; sourceTree = "<group>"; };
+		83D4CEA8140AAEC200C157C2 /* libafp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libafp.h; sourceTree = "<group>"; };
+		83D4CEAF140AAF8400C157C2 /* liblibxafp.a.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = liblibxafp.a.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		83D4D47B1415596A00C157C2 /* Utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Utils.cpp; path = src/Utils.cpp; sourceTree = "<group>"; };
+		8DD76F6C0486A84900D96B5E /* libxafp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = libxafp; sourceTree = BUILT_PRODUCTS_DIR; };
+		C6859E8B029090EE04C91782 /* libxafp.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = libxafp.1; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		83D4CEAD140AAF8400C157C2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8DD76F660486A84900D96B5E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		08FB7794FE84155DC02AAC07 /* libxafp */ = {
+			isa = PBXGroup;
+			children = (
+				08FB7795FE84155DC02AAC07 /* Source */,
+				C6859E8C029090F304C91782 /* Documentation */,
+				1AB674ADFE9D54B511CA2CBB /* Products */,
+			);
+			name = libxafp;
+			sourceTree = "<group>";
+		};
+		08FB7795FE84155DC02AAC07 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				83D4CE98140AAD8100C157C2 /* include */,
+				83D4CE90140AAD1B00C157C2 /* test */,
+				83D4CE8D140AAD0B00C157C2 /* src */,
+			);
+			name = Source;
+			sourceTree = "<group>";
+		};
+		1AB674ADFE9D54B511CA2CBB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8DD76F6C0486A84900D96B5E /* libxafp */,
+				83D4CEAF140AAF8400C157C2 /* liblibxafp.a.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		83D4CE8D140AAD0B00C157C2 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				83D4D47A1415594300C157C2 /* Common */,
+				83D4CEC1140AAFFB00C157C2 /* AFP */,
+				83D4CEC0140AAFF500C157C2 /* DSI */,
+				83D4CEBF140AAFED00C157C2 /* TCP */,
+				83D4CEA6140AAEB800C157C2 /* libafp.cpp */,
+			);
+			name = src;
+			sourceTree = "<group>";
+		};
+		83D4CE90140AAD1B00C157C2 /* test */ = {
+			isa = PBXGroup;
+			children = (
+				08FB7796FE84155DC02AAC07 /* main.cpp */,
+			);
+			name = test;
+			path = src;
+			sourceTree = "<group>";
+		};
+		83D4CE98140AAD8100C157C2 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				83D4CEA8140AAEC200C157C2 /* libafp.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		83D4CEBF140AAFED00C157C2 /* TCP */ = {
+			isa = PBXGroup;
+			children = (
+				83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */,
+				83D4CEA1140AAE6000C157C2 /* TCPClient.h */,
+			);
+			name = TCP;
+			sourceTree = "<group>";
+		};
+		83D4CEC0140AAFF500C157C2 /* DSI */ = {
+			isa = PBXGroup;
+			children = (
+				83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */,
+				83D4CE9F140AAE6000C157C2 /* DSIClient.h */,
+				83A86036142047E5000B8F90 /* DSIProto.h */,
+			);
+			name = DSI;
+			sourceTree = "<group>";
+		};
+		83D4CEC1140AAFFB00C157C2 /* AFP */ = {
+			isa = PBXGroup;
+			children = (
+				83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */,
+				83D4CE9D140AAE6000C157C2 /* AFPClient.h */,
+				83A85AE1141BCC00000B8F90 /* AFPProto.h */,
+			);
+			name = AFP;
+			sourceTree = "<group>";
+		};
+		83D4D47A1415594300C157C2 /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				83A86037142047E5000B8F90 /* Logging.cpp */,
+				83A86038142047E5000B8F90 /* Logging.h */,
+				83D4CEA2140AAE6000C157C2 /* Utils.h */,
+				83D4D47B1415596A00C157C2 /* Utils.cpp */,
+			);
+			name = Common;
+			sourceTree = "<group>";
+		};
+		C6859E8C029090F304C91782 /* Documentation */ = {
+			isa = PBXGroup;
+			children = (
+				C6859E8B029090EE04C91782 /* libxafp.1 */,
+			);
+			name = Documentation;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		83D4CEAB140AAF8400C157C2 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		83D4CEAE140AAF8400C157C2 /* libxafp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 83D4CEB5140AAF9000C157C2 /* Build configuration list for PBXNativeTarget "libxafp" */;
+			buildPhases = (
+				83D4CEAB140AAF8400C157C2 /* Headers */,
+				83D4CEAC140AAF8400C157C2 /* Sources */,
+				83D4CEAD140AAF8400C157C2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = libxafp;
+			productName = libxafp.a;
+			productReference = 83D4CEAF140AAF8400C157C2 /* liblibxafp.a.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		8DD76F620486A84900D96B5E /* libxafp-test */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DEB923108733DC60010E9CD /* Build configuration list for PBXNativeTarget "libxafp-test" */;
+			buildPhases = (
+				8DD76F640486A84900D96B5E /* Sources */,
+				8DD76F660486A84900D96B5E /* Frameworks */,
+				8DD76F690486A84900D96B5E /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "libxafp-test";
+			productInstallPath = "$(HOME)/bin";
+			productName = libxafp;
+			productReference = 8DD76F6C0486A84900D96B5E /* libxafp */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		08FB7793FE84155DC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 1DEB923508733DC60010E9CD /* Build configuration list for PBXProject "libxafp" */;
+			compatibilityVersion = "Xcode 3.1";
+			developmentRegion = English;
+			hasScannedForEncodings = 1;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+			);
+			mainGroup = 08FB7794FE84155DC02AAC07 /* libxafp */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8DD76F620486A84900D96B5E /* libxafp-test */,
+				83D4CEAE140AAF8400C157C2 /* libxafp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		83D4CEAC140AAF8400C157C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				83D4CEB6140AAFB200C157C2 /* libafp.cpp in Sources */,
+				83D4CEB7140AAFB200C157C2 /* AFPClient.cpp in Sources */,
+				83D4CEB8140AAFB200C157C2 /* DSIClient.cpp in Sources */,
+				83D4CEB9140AAFB200C157C2 /* TCPClient.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8DD76F640486A84900D96B5E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DD76F650486A84900D96B5E /* main.cpp in Sources */,
+				83D4CEA3140AAE6000C157C2 /* AFPClient.cpp in Sources */,
+				83D4CEA4140AAE6000C157C2 /* DSIClient.cpp in Sources */,
+				83D4CEA5140AAE6000C157C2 /* TCPClient.cpp in Sources */,
+				83D4CEA7140AAEB800C157C2 /* libafp.cpp in Sources */,
+				83D4D47C1415596A00C157C2 /* Utils.cpp in Sources */,
+				83A86039142047E5000B8F90 /* Logging.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1DEB923208733DC60010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				INSTALL_PATH = /usr/local/bin;
+				PRODUCT_NAME = libxafp;
+			};
+			name = Debug;
+		};
+		1DEB923308733DC60010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_MODEL_TUNING = G5;
+				INSTALL_PATH = /usr/local/bin;
+				PRODUCT_NAME = libxafp;
+			};
+			name = Release;
+		};
+		1DEB923608733DC60010E9CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PREBINDING = NO;
+				SDKROOT = macosx10.6;
+			};
+			name = Debug;
+		};
+		1DEB923708733DC60010E9CD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PREBINDING = NO;
+				SDKROOT = macosx10.6;
+			};
+			name = Release;
+		};
+		83D4CEB0140AAF8500C157C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				INSTALL_PATH = /usr/local/lib;
+				PREBINDING = NO;
+				PRODUCT_NAME = libxafp.a;
+			};
+			name = Debug;
+		};
+		83D4CEB1140AAF8500C157C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				GCC_MODEL_TUNING = G5;
+				INSTALL_PATH = /usr/local/lib;
+				PREBINDING = NO;
+				PRODUCT_NAME = libxafp.a;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB923108733DC60010E9CD /* Build configuration list for PBXNativeTarget "libxafp-test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB923208733DC60010E9CD /* Debug */,
+				1DEB923308733DC60010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DEB923508733DC60010E9CD /* Build configuration list for PBXProject "libxafp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DEB923608733DC60010E9CD /* Debug */,
+				1DEB923708733DC60010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		83D4CEB5140AAF9000C157C2 /* Build configuration list for PBXNativeTarget "libxafp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83D4CEB0140AAF8500C157C2 /* Debug */,
+				83D4CEB1140AAF8500C157C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 08FB7793FE84155DC02AAC07 /* Project object */;
+}
