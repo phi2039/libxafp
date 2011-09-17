@@ -1,4 +1,3 @@
-#pragma once
 /*
  *      Copyright (C) 2005-2011 Team XBMC
  *      http://www.xbmc.org
@@ -19,4 +18,7 @@
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
+
+#include "../include/libxafp.h"
+
 

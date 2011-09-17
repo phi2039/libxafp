@@ -1,3 +1,4 @@
+#pragma once
 /*
  *      Copyright (C) 2005-2011 Team XBMC
  *      http://www.xbmc.org
@@ -19,5 +20,7 @@
  *
  */
 
-#include "libafp.h"
+struct xafp_client_context
+{
 
+};
