@@ -11,8 +11,8 @@
 		83D4CEA3140AAE6000C157C2 /* AFPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */; };
 		83D4CEA4140AAE6000C157C2 /* DSIClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */; };
 		83D4CEA5140AAE6000C157C2 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
-		83D4CEA7140AAEB800C157C2 /* libafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libafp.cpp */; };
-		83D4CEB6140AAFB200C157C2 /* libafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libafp.cpp */; };
+		83D4CEA7140AAEB800C157C2 /* libxafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libxafp.cpp */; };
+		83D4CEB6140AAFB200C157C2 /* libxafp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA6140AAEB800C157C2 /* libxafp.cpp */; };
 		83D4CEB7140AAFB200C157C2 /* AFPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */; };
 		83D4CEB8140AAFB200C157C2 /* DSIClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */; };
 		83D4CEB9140AAFB200C157C2 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
@@ -40,6 +40,7 @@
 		83A86036142047E5000B8F90 /* DSIProto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DSIProto.h; path = src/DSIProto.h; sourceTree = "<group>"; };
 		83A86037142047E5000B8F90 /* Logging.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Logging.cpp; path = src/Logging.cpp; sourceTree = "<group>"; };
 		83A86038142047E5000B8F90 /* Logging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Logging.h; path = src/Logging.h; sourceTree = "<group>"; };
+		83A8612614219B72000B8F90 /* libxafp_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = libxafp_internal.h; path = src/libxafp_internal.h; sourceTree = "<group>"; };
 		83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AFPClient.cpp; path = src/AFPClient.cpp; sourceTree = "<group>"; };
 		83D4CE9D140AAE6000C157C2 /* AFPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AFPClient.h; path = src/AFPClient.h; sourceTree = "<group>"; };
 		83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DSIClient.cpp; path = src/DSIClient.cpp; sourceTree = "<group>"; };
@@ -47,8 +48,8 @@
 		83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TCPClient.cpp; path = src/TCPClient.cpp; sourceTree = "<group>"; };
 		83D4CEA1140AAE6000C157C2 /* TCPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TCPClient.h; path = src/TCPClient.h; sourceTree = "<group>"; };
 		83D4CEA2140AAE6000C157C2 /* Utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Utils.h; path = src/Utils.h; sourceTree = "<group>"; };
-		83D4CEA6140AAEB800C157C2 /* libafp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = libafp.cpp; path = src/libafp.cpp; sourceTree = "<group>"; };
-		83D4CEA8140AAEC200C157C2 /* libafp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libafp.h; sourceTree = "<group>"; };
+		83D4CEA6140AAEB800C157C2 /* libxafp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = libxafp.cpp; path = src/libxafp.cpp; sourceTree = "<group>"; };
+		83D4CEA8140AAEC200C157C2 /* libxafp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libxafp.h; sourceTree = "<group>"; };
 		83D4CEAF140AAF8400C157C2 /* liblibxafp.a.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = liblibxafp.a.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		83D4D47B1415596A00C157C2 /* Utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Utils.cpp; path = src/Utils.cpp; sourceTree = "<group>"; };
 		8DD76F6C0486A84900D96B5E /* libxafp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = libxafp; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -109,7 +110,7 @@
 				83D4CEC1140AAFFB00C157C2 /* AFP */,
 				83D4CEC0140AAFF500C157C2 /* DSI */,
 				83D4CEBF140AAFED00C157C2 /* TCP */,
-				83D4CEA6140AAEB800C157C2 /* libafp.cpp */,
+				83D4CEA6140AAEB800C157C2 /* libxafp.cpp */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -126,7 +127,7 @@
 		83D4CE98140AAD8100C157C2 /* include */ = {
 			isa = PBXGroup;
 			children = (
-				83D4CEA8140AAEC200C157C2 /* libafp.h */,
+				83D4CEA8140AAEC200C157C2 /* libxafp.h */,
 			);
 			path = include;
 			sourceTree = "<group>";
@@ -167,6 +168,7 @@
 				83A86038142047E5000B8F90 /* Logging.h */,
 				83D4CEA2140AAE6000C157C2 /* Utils.h */,
 				83D4D47B1415596A00C157C2 /* Utils.cpp */,
+				83A8612614219B72000B8F90 /* libxafp_internal.h */,
 			);
 			name = Common;
 			sourceTree = "<group>";
@@ -257,7 +259,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				83D4CEB6140AAFB200C157C2 /* libafp.cpp in Sources */,
+				83D4CEB6140AAFB200C157C2 /* libxafp.cpp in Sources */,
 				83D4CEB7140AAFB200C157C2 /* AFPClient.cpp in Sources */,
 				83D4CEB8140AAFB200C157C2 /* DSIClient.cpp in Sources */,
 				83D4CEB9140AAFB200C157C2 /* TCPClient.cpp in Sources */,
@@ -272,7 +274,7 @@
 				83D4CEA3140AAE6000C157C2 /* AFPClient.cpp in Sources */,
 				83D4CEA4140AAE6000C157C2 /* DSIClient.cpp in Sources */,
 				83D4CEA5140AAE6000C157C2 /* TCPClient.cpp in Sources */,
-				83D4CEA7140AAEB800C157C2 /* libafp.cpp in Sources */,
+				83D4CEA7140AAEB800C157C2 /* libxafp.cpp in Sources */,
 				83D4D47C1415596A00C157C2 /* Utils.cpp in Sources */,
 				83A86039142047E5000B8F90 /* Logging.cpp in Sources */,
 			);
