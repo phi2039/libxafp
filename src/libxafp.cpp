@@ -72,6 +72,9 @@ xafp_client_handle xafp_create_context(const char* pServer, const char* pUser, c
 
 void xafp_destroy_context(xafp_client_handle hnd)
 {
+  if (!hnd)
+    return;
+  
   _client_context* pCtx = (_client_context*)hnd;
   
   delete pCtx->volumes;
@@ -89,6 +92,12 @@ void xafp_destroy_context(xafp_client_handle hnd)
 //////////////////////////////////////
 int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags)
 {
+  if (!hnd)
+    return -4;
+  
+  if (!pVolumeName)
+    return -5;
+
   _client_context* pCtx = (_client_context*)hnd;
   
   // This interface is late-binding, so the first mount request triggers connect/login
@@ -114,6 +123,9 @@ int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags
 
 void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName)
 {
+  if (!hnd || !pVolumeName)
+    return;
+  
   int volId = xafp_find_volume_id(hnd, pVolumeName);
 
   if (volId)
@@ -186,19 +198,49 @@ void xafp_free_iter(xafp_node_iterator iter)
 // Returns: Handle on success (> 0), error code on failure (< 0)
 xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_open_flags flags)
 {
-  return 0;
+  if (!hnd || !pPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  int pos = path.find('/');
+  std::string volume = path.substr(0, pos);
+  int volId = xafp_find_volume_id(hnd, volume.c_str());
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    std::string dir = path.substr(pos + 1,path.rfind('/') - pos);
+    int dirId = pCtx->session->GetDirectory(volId, dir.c_str());
+    if (dirId > 0)
+    {
+      std::string file = path.substr(path.rfind('/') + 1);
+      return pCtx->session->OpenFile(volId, dirId, file.c_str());
+    }
+    else 
+      return -2;
+  }
+  
+  return -3;
 }
 
 // Function: xafp_read_file
-// Returns: 0 on success, error code on failure (< 0)
-int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, void* pBuf, unsigned int len)
+// Returns: bytes read on success (> 0), error code on failure (< 0)
+int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len)
 {
-  return 0;  
+  if (!hnd || !file || !pBuf || !len)
+    return 0;
+
+  _client_context* pCtx = (_client_context*)hnd;
+  return pCtx->session->ReadFile(file, offset, pBuf, len);
 }
 
 // Function: xafp_close_file
 // Returns: None
 void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file)
 {
+  if (!hnd || !file)
+    return;
   
+  _client_context* pCtx = (_client_context*)hnd;
+  pCtx->session->CloseFile(file);
 }

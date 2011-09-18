@@ -66,7 +66,7 @@ xafp_node_handle xafp_next(xafp_node_iterator iter);
 void xafp_free_iter(xafp_node_iterator iter);
 
 xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_open_flags flags);
-int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, void* pBuf, unsigned int len);
+int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len);
 void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file);
 
 // xafp_create_file

@@ -6,22 +6,13 @@
 
 void cp(const char* path, const char* dest, const char* username, const char* pass)
 {
-  // Obtain an AFP Session
-  // TODO: Should we implement a session manager to minimize setup/teardown?
-  CAFPSession session;
-  //  if(!session.Open("127.0.0.1", 548, 3000))
-  if(!session.Open("kennel", 548, 3000))
-    return;
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
   
-  // Authenticate the session
-  session.Login(username,pass);
-  
-  uint32_t volID = session.OpenVolume("Media");
-  if (volID)
+  // Authenticate and open the desired volume
+  // TODO: Strip out volume name
+  if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
   {
-    int dirID = session.GetDirectory(volID, path);
-    //session.List(volID, dirID);
-    int fileHandle = session.OpenFile(volID, dirID, "Aeon Flux.mp4");
+    xafp_file_handle fileHandle = xafp_open_file(ctx, path, xafp_open_flag_read);
     if (fileHandle)
     {
       uint64_t bytesWritten = 0;
@@ -31,7 +22,7 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
       void* pBuf = malloc(bufLen);
       time_t lastTime = time(NULL);
       time_t startTime = lastTime;
-      while (session.ReadFile(fileHandle, bytesWritten, pBuf, bufLen) > 0)
+      while (xafp_read_file(ctx, fileHandle, bytesWritten, pBuf, bufLen) > 0)
       {
         fwrite(pBuf, 1, bufLen, fp);
         bytesWritten += bufLen; 
@@ -48,14 +39,13 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
       printf("%lu: Wrote %llu bytes in %lu seconds (%0.2f KB/sec)\n", clock(), bytesWritten, deltaTime, (double)(bytesWritten/1024) / (double)deltaTime);
       free(pBuf);
       fclose(fp);
-      session.CloseFile(fileHandle);
+      xafp_close_file(ctx, fileHandle);
     }
-    session.CloseVolume(volID);
+    xafp_unmount(ctx, "Media");
   }
   
   // Clean-up the session
-  session.Logout();
-  session.Close();
+  xafp_destroy_context(ctx);
 }
 
 void ls(const char* path, const char* username, const char* pass)
@@ -115,6 +105,8 @@ int main (int argc, char * const argv[])
   fread(secret, 1, sizeof(secret), fsecret);
 
   ls("/Media/video/Movies/BRRip","chris",secret);
+  
+  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
   
   return 0;
 }
