@@ -1,9 +1,10 @@
 #include <iostream>
 
+#include "../include/libxafp.h"
 #include "../src/AFPClient.h"
-#include "../src/AFPClient.h"
+#include "../src/AFPProto.h"
 
-void ls(const char* path, const char* username, const char* pass)
+void cp(const char* path, const char* dest, const char* username, const char* pass)
 {
   // Obtain an AFP Session
   // TODO: Should we implement a session manager to minimize setup/teardown?
@@ -57,6 +58,55 @@ void ls(const char* path, const char* username, const char* pass)
   session.Close();
 }
 
+void ls(const char* path, const char* username, const char* pass)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  // TODO: Strip out volume name
+  if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
+  {
+    xafp_node_iterator iter = xafp_get_dir_iter(ctx, path);
+    xafp_node_handle node = xafp_next(iter);
+    while(node)
+    {
+      CNodeParams* pParams = (CNodeParams*)node;
+      if (!(pParams->GetAttributes() & kFPInvisibleBit))
+      {
+        uint32_t perms = pParams->GetPermissions();
+        time_t modTime = pParams->GetModDate();
+        char timeString[32];
+        strncpy(timeString, ctime(&modTime), 32);
+        timeString[strlen(timeString) - 1] = '\0';
+        printf ("%s%s%s%s%s%s%s%s%s%s %s %d %d %d %s %s\n", 
+                pParams->IsDirectory() ? "d" : "-",
+                (perms & kRPOwner) ? "r" : "-",
+                (perms & kWROwner) ? "w" : "-",
+                (perms & kSPGroup) ? "x" : "-",
+                (perms & kRPGroup) ? "r" : "-",
+                (perms & kWRGroup) ? "w" : "-",
+                (perms & kSPGroup) ? "x" : "-",
+                (perms & kRPOther) ? "r" : "-",
+                (perms & kWROther) ? "w" : "-",
+                (perms & kSPOther) ? "x" : "-",
+                "-",
+                pParams->GetUserId(),
+                pParams->GetGroupId(),
+                pParams->IsDirectory() ? 0 : 0,
+                timeString,
+                pParams->GetName()
+                );
+      }
+      node = xafp_next(iter);
+    }
+    xafp_free_iter(iter);
+    xafp_unmount(ctx, "Media");
+  }
+  
+  // Clean-up the session
+  xafp_destroy_context(ctx);
+}
+
 int main (int argc, char * const argv[]) 
 {
   XafpSetLogLevel(XAFP_LOG_LEVEL_INFO);
@@ -64,7 +114,7 @@ int main (int argc, char * const argv[])
   FILE* fsecret = fopen(argv[1], "r");
   fread(secret, 1, sizeof(secret), fsecret);
 
-  ls("video/Movies/BRRip","chris",secret);
+  ls("/Media/video/Movies/BRRip","chris",secret);
   
   return 0;
 }

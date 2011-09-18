@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -23,38 +23,51 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-struct xafp_client_context;
-typedef struct xafp_client_context xafp_client_context;
+typedef struct _client_context* xafp_client_handle;
 
-struct xafp_node_iterator;
-typedef struct xafp_node_iterator xafp_node_iterator;
+typedef struct _fs_node_iterator* xafp_node_iterator;
 
-struct xafp_node;
-typedef struct xafp_node xafp_node;
+typedef struct _fs_node* xafp_node_handle;
+
+typedef int xafp_file_handle;
 
 // TODO: define common error codes
 
 enum xafp_mount_flags
 {
-  xafp_mount_flag_read = 0x1 << 0,
+  xafp_mount_flag_none   = 0x0,
+  xafp_mount_flag_read  = 0x1 << 0,
   xafp_mount_flag_write = 0x1 << 1,
+};
+
+enum xafp_open_flags
+{
+  xafp_open_flag_read   = 0x1 << 0,
+  xafp_open_flag_write  = 0x1 << 1,
+};
+
+enum xafp_node_type
+{
+  xafp_node_file        = 0x0,
+  xafp_node_directory   = 0x1
 };
 
 // Client Interface Definition
 ///////////////////////////////////////////////////////
-xafp_client_context* xafp_create_context(const char* pServer, int port=548, const char* pUser=NULL, const char* pPass=NULL);
-xafp_client_context* xafp_create_context(const char* pServer, const char* pUser, const char* pPass);
-void xafp_destroy_context(xafp_client_context* pCtx);
+xafp_client_handle xafp_create_context(const char* pServer, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
+xafp_client_handle xafp_create_context(const char* pServer, const char* pUser, const char* pPass);
+void xafp_destroy_context(xafp_client_handle pCtx);
 
-int xafp_mount(xafp_client_context* pCtx, const char* pVolumeName, xafp_mount_flags flags);
-void xafp_unmount(xafp_client_context* pCtx);
+int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags);
+void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName);
 
-xafp_dir_iterator* xafp_list_dir(xafp_client_context* pCtx, const char* pPath);
-xafp_node* xafp_next(xafp_node_iterator* pIter);
+xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath);
+xafp_node_handle xafp_next(xafp_node_iterator iter);
+void xafp_free_iter(xafp_node_iterator iter);
 
-// xafp_open_file
-// xafp_read_file
-// xafp_close_file
+xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_open_flags flags);
+int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, void* pBuf, unsigned int len);
+void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file);
 
 // xafp_create_file
 // xafp_create_dir

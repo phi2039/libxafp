@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		83A86039142047E5000B8F90 /* Logging.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83A86037142047E5000B8F90 /* Logging.cpp */; };
+		83A861B114265502000B8F90 /* Threads.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83A861B014265502000B8F90 /* Threads.cpp */; };
 		83D4CEA3140AAE6000C157C2 /* AFPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */; };
 		83D4CEA4140AAE6000C157C2 /* DSIClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */; };
 		83D4CEA5140AAE6000C157C2 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
@@ -41,6 +42,9 @@
 		83A86037142047E5000B8F90 /* Logging.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Logging.cpp; path = src/Logging.cpp; sourceTree = "<group>"; };
 		83A86038142047E5000B8F90 /* Logging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Logging.h; path = src/Logging.h; sourceTree = "<group>"; };
 		83A8612614219B72000B8F90 /* libxafp_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = libxafp_internal.h; path = src/libxafp_internal.h; sourceTree = "<group>"; };
+		83A861AD1426549E000B8F90 /* Common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Common.h; path = src/Common.h; sourceTree = "<group>"; };
+		83A861AF14265502000B8F90 /* Threads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Threads.h; path = src/Threads.h; sourceTree = "<group>"; };
+		83A861B014265502000B8F90 /* Threads.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Threads.cpp; path = src/Threads.cpp; sourceTree = "<group>"; };
 		83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AFPClient.cpp; path = src/AFPClient.cpp; sourceTree = "<group>"; };
 		83D4CE9D140AAE6000C157C2 /* AFPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AFPClient.h; path = src/AFPClient.h; sourceTree = "<group>"; };
 		83D4CE9E140AAE6000C157C2 /* DSIClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DSIClient.cpp; path = src/DSIClient.cpp; sourceTree = "<group>"; };
@@ -103,14 +107,33 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		83A861A1142652FB000B8F90 /* Interface */ = {
+			isa = PBXGroup;
+			children = (
+				83A8612614219B72000B8F90 /* libxafp_internal.h */,
+				83D4CEA6140AAEB800C157C2 /* libxafp.cpp */,
+			);
+			name = Interface;
+			sourceTree = "<group>";
+		};
+		83A861AE142654E0000B8F90 /* Threading */ = {
+			isa = PBXGroup;
+			children = (
+				83A861AF14265502000B8F90 /* Threads.h */,
+				83A861B014265502000B8F90 /* Threads.cpp */,
+			);
+			name = Threading;
+			sourceTree = "<group>";
+		};
 		83D4CE8D140AAD0B00C157C2 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				83A861A1142652FB000B8F90 /* Interface */,
 				83D4D47A1415594300C157C2 /* Common */,
 				83D4CEC1140AAFFB00C157C2 /* AFP */,
 				83D4CEC0140AAFF500C157C2 /* DSI */,
 				83D4CEBF140AAFED00C157C2 /* TCP */,
-				83D4CEA6140AAEB800C157C2 /* libxafp.cpp */,
+				83A861AE142654E0000B8F90 /* Threading */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -164,11 +187,11 @@
 		83D4D47A1415594300C157C2 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				83A861AD1426549E000B8F90 /* Common.h */,
 				83A86037142047E5000B8F90 /* Logging.cpp */,
 				83A86038142047E5000B8F90 /* Logging.h */,
 				83D4CEA2140AAE6000C157C2 /* Utils.h */,
 				83D4D47B1415596A00C157C2 /* Utils.cpp */,
-				83A8612614219B72000B8F90 /* libxafp_internal.h */,
 			);
 			name = Common;
 			sourceTree = "<group>";
@@ -277,6 +300,7 @@
 				83D4CEA7140AAEB800C157C2 /* libxafp.cpp in Sources */,
 				83D4D47C1415596A00C157C2 /* Utils.cpp in Sources */,
 				83A86039142047E5000B8F90 /* Logging.cpp in Sources */,
+				83A861B114265502000B8F90 /* Threads.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,3 +1,4 @@
+#pragma once
 /*
  *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
@@ -19,19 +20,21 @@
  *
  */
 
-#include "Logging.h"
-#include <stdio.h>
+#include "Common.h"
+#include <pthread.h>
 
-XafpLogFuncPtr xafplog = printf;
-int g_xafplevel = XAFP_LOG_LEVEL_ERROR;
-
-void XafpSetLogFunc(XafpLogFuncPtr func)
+// Simple Thread Synchronization Event Wrapper
+//////////////////////////////////////////////
+class CThreadSyncEvent
 {
-  if (func)
-    xafplog = func;
-}
-
-void XafpSetLogLevel(int level)
-{
-  g_xafplevel = level;
-}
+public:
+  CThreadSyncEvent();
+  virtual ~CThreadSyncEvent();
+  int Wait(int timeout = -1);
+  void Set();
+  void Reset();
+protected:
+  pthread_mutex_t m_Mutex;
+  pthread_cond_t m_Cond;
+  bool m_Signaled;
+};

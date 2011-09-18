@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,6 +19,8 @@
  *
  */
 
+#include "Common.h"
+
 #include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -26,15 +28,16 @@
 
 #include "AFPClient.h"
 #include "AFPProto.h"
-#include "Utils.h"
-
 
 // AFP File and Directory Parameter Handling
 /////////////////////////////////////////////////////////////////////////////////
+// Node dates are represented by the number of seconds since '01/01/2000 00:00:00.0 UTC'
+#define AFPTimeToTime_t(t) (t + ((2000 - 1970) * 365 * 86400) + (7 * 86400)) // Adjust for differences in epoch, including leap years
+
 CNodeParams::CNodeParams() :
   m_pName(NULL)
 {
-  
+  // TODO: Initialize remaining members
 }
 
 CNodeParams::~CNodeParams()
@@ -58,17 +61,17 @@ int CNodeParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   }
   if (bitmap & kFPCreateDateBit)
   {
-    m_CreateDate = ntohl(*(uint32_t*)p);
+    m_CreateDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPModDateBit)
   {
-    m_ModDate = ntohl(*(uint32_t*)p);
+    m_ModDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPBackupDateBit)
   {
-    m_BackupDate = ntohl(*(uint32_t*)p);
+    m_BackupDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPFinderInfoBit)
@@ -92,6 +95,7 @@ CDirParams::CDirParams(uint32_t bitmap, uint8_t* pData, uint32_t size) :
   CNodeParams()
 {
   Parse(bitmap, pData, size);
+  m_IsDirectory = true;
 }
 
 int CDirParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
@@ -163,6 +167,7 @@ CFileParams::CFileParams(uint32_t bitmap, uint8_t* pData, uint32_t size) :
   CNodeParams()
 {
   Parse(bitmap, pData, size);
+  m_IsDirectory = false;
 }
 
 int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
@@ -241,6 +246,67 @@ int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   return (p - pData);
 }
 
+
+// AFP Node List/Iterator
+/////////////////////////////////////////////////////////////////////////////////
+// TODO: Only one iterator is available at a time...should this change?
+CAFPNodeList::CAFPNodeList(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap,int count) :
+  m_pBuffer(pBuf),
+  m_DirBitmap(dirBitmap),
+  m_FileBitmap(fileBitmap),
+  m_Count(count),
+  m_Iter(pBuf, dirBitmap, fileBitmap)
+{
+  
+}
+
+CAFPNodeList::~CAFPNodeList()
+{
+  delete m_pBuffer;
+}
+
+CAFPNodeList::Iterator::Iterator(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap) :
+  m_DirBitmap(dirBitmap),
+  m_FileBitmap(fileBitmap),
+  m_pCurrent(NULL)
+{
+  m_pData = ((uint8_t*)pBuf->GetData()) + 6;
+  m_pEnd = m_pData + pBuf->GetDataLen() - 6;
+  
+  //m_pCurrent = MoveNext(); // Parse the first node
+};
+
+CNodeParams* CAFPNodeList::Iterator::MoveNext()
+{
+  if (m_pData >= m_pEnd)
+  {
+    m_pCurrent = NULL;
+    return NULL; // We already reached the end
+  }
+  
+  uint16_t len = ntohs(*((uint16_t*)m_pData)); // Entry size
+  if ((m_pData + len) > m_pEnd) // Make sure we don't fall off the end of the world...
+  {
+    m_pData = m_pEnd;
+    m_pCurrent = NULL;
+    return NULL;
+  }
+  
+  if (*(m_pData + sizeof(uint16_t)) & 0x80) // Directory bit + pad(7bits) -- followed by another byte of padding
+  {
+    m_DirParams.Parse(m_DirBitmap, m_pData+4, len-4);
+    m_pCurrent = &m_DirParams;
+  }
+  else
+  {
+    m_FileParams.Parse(m_FileBitmap, m_pData+4, len-4);
+    m_pCurrent = &m_FileParams;
+  }
+  m_pData += len;
+  return m_pCurrent;
+}
+
+
 // AFP Session Handling
 /////////////////////////////////////////////////////////////////////////////////
 CAFPSession::CAFPSession() :
@@ -294,7 +360,7 @@ void CAFPSession::Logout()
 int CAFPSession::OpenVolume(const char* pVolName)
 {
   if (!IsLoggedIn())
-    return false;
+    return kFPUserNotAuth;
  
   CDSIBuffer reqBuf(4 + 1 + strlen(pVolName));
   reqBuf.Write((uint8_t)FPOpenVol); // Command
@@ -314,7 +380,7 @@ int CAFPSession::OpenVolume(const char* pVolName)
       return volID;      
     }
   }
-  return 0;  
+  return kNoError;  
 }
 
 void CAFPSession::CloseVolume(int volId)
@@ -352,7 +418,7 @@ int CAFPSession::GetDirectory(int volumeID, const char* pPath)
 int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
 {
   if (!IsLoggedIn())
-    return false;
+    return 0;
   
   CDSIBuffer reqBuf(13 + 4 + 1 + strlen(pName));
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
@@ -386,10 +452,13 @@ int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
   return 0; // TODO: Need error codes for callers...
 }
 
-void CAFPSession::List(int volumeID, int dirID)
+int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID)
 {
   if (!IsLoggedIn())
-    return;
+    return kFPUserNotAuth;
+
+  if (!ppList)
+    return kParamError;
   
   // TODO: handle instances that require multiple calls (too many entries for one block)
   CDSIBuffer reqBuf(29); // TODO: This method of sizing the request block is WAAAY too error-prone...
@@ -409,67 +478,21 @@ void CAFPSession::List(int volumeID, int dirID)
   reqBuf.Write((uint32_t)0x08000103); // Unknown
   reqBuf.Write((uint16_t)0); // Name Length
   
-  CDSIBuffer replyBuf;
-  uint32_t err = SendCommand(reqBuf, &replyBuf);
+  CDSIBuffer* pReplyBuf = new CDSIBuffer();
+  uint32_t err = SendCommand(reqBuf, pReplyBuf);
   if (err == kNoError)
   {
     // TODO: Validate returned bitmap vs provided one
-    replyBuf.Read16(); // Skip File Bitmap (we already specified)
-    replyBuf.Read16(); // Skip Directory Bitmap (we already specified)
-    int count = replyBuf.Read16(); // Results Returned
-
-    uint8_t* pData = ((uint8_t*)replyBuf.GetData()) + 6;
-    CFileParams fileParams;
-    CDirParams dirParams;
-    printf("total %d\n", count);
-    for (int i = 0; i < count; i++)
-    {
-      uint16_t len  = ntohs(*((uint16_t*)pData)); // Entry size (adjusted for header size)
-      
-      bool isDir = *(pData + sizeof(uint16_t)) & 0x80; // Directory bit + pad(7bits) -- followed by another byte of padding
-      
-      CNodeParams* pParams = NULL;
-      if (!isDir)
-      {
-        fileParams.Parse(fileBitmap, pData + 4, len - 4);
-        pParams = &fileParams;
-      }
-      else
-      {
-        dirParams.Parse(dirBitmap, pData + 4, len - 4);
-        pParams = &dirParams;
-      }
-      
-      // drwxr-sr-x 4 chris Default 4096 Jul  5 19:35 SD
-      uint32_t attribs = pParams->GetAttributes();
-      if (!(attribs & kFPInvisibleBit))
-      {
-        uint32_t perms = pParams->GetPermissions();
-        time_t modTime = pParams->GetModDate() + ((2000 - 1970) * 365 * 86400) + (7 * 86400); // Adjust for differences in epoch, including leap years
-        char timeString[32];
-        strncpy(timeString, ctime(&modTime), 32);
-        timeString[strlen(timeString) - 1] = '\0';
-        printf ("%s%s%s%s%s%s%s%s%s%s %s %d %d %d %s %s\n", 
-                isDir ? "d" : "-",
-                (perms & kRPOwner) ? "r" : "-",
-                (perms & kWROwner) ? "w" : "-",
-                (perms & kSPGroup) ? "x" : "-",
-                (perms & kRPGroup) ? "r" : "-",
-                (perms & kWRGroup) ? "w" : "-",
-                (perms & kSPGroup) ? "x" : "-",
-                (perms & kRPOther) ? "r" : "-",
-                (perms & kWROther) ? "w" : "-",
-                (perms & kSPOther) ? "x" : "-",
-                "-",
-                pParams->GetUserId(),
-                pParams->GetGroupId(),
-                isDir ? 0 : 0,
-                timeString,
-                pParams->GetName()
-                );
-      }
-      pData += len;
-    }
+    pReplyBuf->Read16(); // Skip File Bitmap (we already specified)
+    pReplyBuf->Read16(); // Skip Directory Bitmap (we already specified)
+    int count = pReplyBuf->Read16(); // Results Returned
+    *ppList = new CAFPNodeList(pReplyBuf, dirBitmap, fileBitmap, count);
+    return kNoError;
+  }
+  else
+  {
+    delete pReplyBuf;
+    return err;
   }
 }
 

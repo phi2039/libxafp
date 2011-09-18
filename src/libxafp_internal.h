@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,7 +20,55 @@
  *
  */
 
-struct xafp_client_context
-{
+#include "../include/libxafp.h"
 
+#include "AFPProto.h"
+#include "AFPClient.h"
+
+#define MAX_SERVER_NAME 32
+#define MAX_SERVER_TYPE 32
+#define MAX_USER_NAME 512 // Up to 255 Unicode chars
+#define MAX_PASSWORD 16
+
+typedef std::map<std::string,int> volume_map;
+typedef std::pair<std::string,int> volume_map_entry;
+typedef volume_map::iterator volume_map_iterator;
+
+struct _client_context
+{
+  char* server_dns_name; // Could also be IP-address string
+  unsigned int port;
+  char* username;
+  char* password;
+
+  CAFPSession* session;
+  volume_map* volumes; 
 };
+
+struct _fs_node
+{
+  CNodeParams* node; // Must be the first item in the struct
+  
+//  std::string name;
+//  std::string path;
+//  xafp_node_type type;
+//  bool hidden;
+//  time_t createTime;
+};
+
+struct _fs_node_iterator
+{
+  CAFPNodeList* list;
+  CAFPNodeList::Iterator* iter;
+};
+
+inline int xafp_find_volume_id(xafp_client_handle hnd, const char* pVolumeName)
+{
+  _client_context* pCtx = (_client_context*)hnd;
+  
+  volume_map_iterator it = pCtx->volumes->find(pVolumeName);
+  if (it == pCtx->volumes->end())
+    return 0; // Was not mounted
+  
+  return it->second;
+}

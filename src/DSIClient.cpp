@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -18,6 +18,8 @@
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
+
+#include "Common.h"
 
 #include "DSIClient.h"
 #include "DSIProto.h"
@@ -466,7 +468,7 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
           break;
         case DSICloseSession: // Notification from server that the session will be closed. 
           // Signal all waiting callers and tell them something happened
-          XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: Server Closed Session. Canceling all panding requests");
+          XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: Server Closed Session. Canceling all pending requests");
           SignalAll(kDSISessionClosed);
           // TODO: Clean-up session (and possibly re-open?)
           break;  

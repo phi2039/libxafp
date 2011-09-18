@@ -1,3 +1,4 @@
+#pragma once
 /*
  *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
@@ -19,19 +20,10 @@
  *
  */
 
+#include <sys/types.h>
+#include <string>
+#include <vector>
+#include <map>
+
 #include "Logging.h"
-#include <stdio.h>
-
-XafpLogFuncPtr xafplog = printf;
-int g_xafplevel = XAFP_LOG_LEVEL_ERROR;
-
-void XafpSetLogFunc(XafpLogFuncPtr func)
-{
-  if (func)
-    xafplog = func;
-}
-
-void XafpSetLogLevel(int level)
-{
-  g_xafplevel = level;
-}
+#include "Utils.h"

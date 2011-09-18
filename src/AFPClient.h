@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -38,14 +38,15 @@ public:
   inline const char* GetName() {return (m_pName == NULL) ? "" : m_pName;}
   inline const time_t GetModDate() {return (time_t)m_ModDate;}
   inline uint16_t GetAttributes() {return m_Attributes;}
-protected: 
+  inline bool IsDirectory() {return m_IsDirectory;}
+protected:
+  bool m_IsDirectory;
   uint16_t m_Attributes;
   uint32_t m_ParentId;
-  // Dates are represented by the number of seconds since '01/01/2000 00:00:00.0 UTC'
   // TODO: Read server time at login and adjust all dates
-  uint32_t m_CreateDate;
-  uint32_t m_ModDate;
-  uint32_t m_BackupDate;
+  time_t m_CreateDate;
+  time_t m_ModDate;
+  time_t m_BackupDate;
   uint32_t m_NodeId;
   char* m_pName;
   struct
@@ -85,6 +86,37 @@ protected:
   uint64_t m_ResourceForkLen;
 };
 
+class CAFPNodeList
+{
+public:
+  CAFPNodeList(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap, int count);
+  virtual ~CAFPNodeList();
+  int GetSize(){return m_Count;}
+  
+  class Iterator
+  {
+  public:
+    Iterator(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap);
+    CNodeParams* MoveNext();
+    CNodeParams* GetCurrent() {return m_pCurrent;}
+  protected:
+    uint8_t* m_pData;
+    uint8_t* m_pEnd;
+    CDirParams m_DirParams;
+    uint32_t m_DirBitmap;
+    CFileParams m_FileParams;
+    uint32_t m_FileBitmap;
+    CNodeParams* m_pCurrent;
+  };
+  Iterator* GetIterator() {return &m_Iter;}
+protected:
+  CDSIBuffer* m_pBuffer;
+  int m_Count;
+  uint32_t m_DirBitmap;
+  uint32_t m_FileBitmap;
+  Iterator m_Iter;
+};
+
 // AFP Session Handling
 /////////////////////////////////////////////////////////////////////////////////
 class CAFPSession : public CDSISession
@@ -99,7 +131,7 @@ public:
   bool IsLoggedIn() {return m_LoggedIn;}
   
   int GetDirectory(int volumeID, const char* pPath);
-  void List(int volumeID, int dirID);
+  int GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID);
   
   int OpenFile(int volumeId, int dirId, const char* pName);
   void CloseFile(int forkId);

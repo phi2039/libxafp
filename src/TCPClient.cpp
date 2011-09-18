@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,27 +19,20 @@
  *
  */
 
-#include <stdio.h>
-#include <assert.h>
-#include <pthread.h>
-#include <pthread.h>
-#include <sys/types.h>
+#include "Common.h"
+
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <poll.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <stdlib.h>
 #include <netdb.h>
 #include <errno.h>
 
 #include "TCPClient.h"
-#include "Utils.h"
 
 // TODO List
 // - Improve start/stop sync for receive thread

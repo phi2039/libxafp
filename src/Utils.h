@@ -1,6 +1,6 @@
 #pragma once
 /*
- *      Copyright (C) 2005-2011 Team XBMC
+ *      Copyright (C) 2011 Team XBMC
  *      http://www.xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -24,8 +24,6 @@
   memcpy(_dst,((char*)_src + 1),*((uint8_t*)_src)); \
   _dst[*((uint8_t*)_src)] = '\0';
 
-#include <pthread.h>
-#include "Logging.h"
 
 enum
 {
@@ -35,17 +33,3 @@ enum
 
 const char* DSIProtoCommandToString(int id);
 const char* AFPProtoCommandToString(int id);
-
-class CThreadSyncEvent
-{
-public:
-  CThreadSyncEvent();
-  virtual ~CThreadSyncEvent();
-  int Wait(int timeout = -1);
-  void Set();
-  void Reset();
-protected:
-  pthread_mutex_t m_Mutex;
-  pthread_cond_t m_Cond;
-  bool m_Signaled;
-};
