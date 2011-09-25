@@ -28,24 +28,24 @@ enum
 {
   //  FPGetSrvrInfo = 15, // Does not seem to be implemented by servers, since DSIGetStatus does the same thing...
   //  FPAccess
-  //  FPAddAPPL
-  //  FPAddComment
-  //  FPAddIcon
-  //  FPByteRangeLock
+  //  FPAddAPPL // Deprecated (10.6.x)
+  //  FPAddComment // Deprecated (10.6.x)
+  //  FPAddIcon // Deprecated (10.6.x)
+  //  FPByteRangeLock // Deprecated (AFP 3.x)
   //  FPByteRangeLockExt
   //  FPCatSearch
   //  FPCatSearchExt
   //  FPChangePassword
-  //  FPCloseDir
-  //  FPCloseDT
+  //  FPCloseDir // Deprecated
+  //  FPCloseDT // Deprecated (10.6.x)
   FPCloseFork = 4,
   FPCloseVol = 2,
   //  FPCopyFile
-  //  FPCreateDir
-  //  FPCreateFile
-  //  FPCreateID
-  //  FPDelete
-  //  FPDeleteID
+  FPCreateDir = 6,
+  FPCreateFile = 7,
+  //  FPCreateID // Deprecated (AFP 3.x)
+  FPDelete = 8,
+  //  FPDeleteID // Deprecated (AFP 3.x)
   //  FPDisconnectOldSession
   //  FPEnumerate
   //  FPEnumerateExt
@@ -97,8 +97,8 @@ enum
   //  FPSpotlightRPC
   //  FPSyncDir
   //  FPSyncFork
-  //  FPWrite
-  //  FPWriteExt
+  //  FPWrite // Deprecated
+  FPWriteExt = 61,
   FPZzzzz = 122  
 };
 
@@ -245,6 +245,18 @@ enum
   kBlankAcess =  0x10000000,
   kUserIsOwner = 0x80000000
 };
+
+enum
+{
+  kRightsUser = 0x8,//->0
+  kRightsGroup = 0x4,//->16
+  kRightsOther = 0x0  //->8
+};
+
+#define __AFPRightsToUnixRights(__x,_out_shift,_in_shift) \
+  ((((__x >> _in_shift) & 0x1) | (((__x >> _in_shift) & 0x2) << 1) | (((__x >> _in_shift) & 0x4) >> 1)) << _out_shift)
+#define AFPRightsToUnixRights(_x) \
+  __AFPRightsToUnixRights(_x,8,0) | __AFPRightsToUnixRights(_x,4,8) | __AFPRightsToUnixRights(_x,0,16)
 
 enum 
 {

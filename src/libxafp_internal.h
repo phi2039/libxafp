@@ -45,17 +45,6 @@ struct _client_context
   volume_map* volumes; 
 };
 
-struct _fs_node
-{
-  CNodeParams* node; // Must be the first item in the struct
-  
-//  std::string name;
-//  std::string path;
-//  xafp_node_type type;
-//  bool hidden;
-//  time_t createTime;
-};
-
 struct _fs_node_iterator
 {
   CAFPNodeList* list;

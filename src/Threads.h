@@ -20,7 +20,6 @@
  *
  */
 
-#include "Common.h"
 #include <pthread.h>
 
 // Simple Thread Synchronization Event Wrapper

@@ -20,8 +20,9 @@
  *
  */
 
-#include "TCPClient.h"
 #include "Threads.h"
+#include "TCPClient.h"
+#include <map>
 
 /////////////////////////////////////////////////////////////////////////////////
 // DSI (Data Stream Interface) Protocol Layer
@@ -82,6 +83,7 @@ public:
   void Write(uint32_t val);
   void Write(uint64_t val);
   void Write(const char* pVal);
+  void WriteUTF8(const char* pVal);
   
   uint8_t Read8();
   uint16_t Read16();

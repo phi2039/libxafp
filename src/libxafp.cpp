@@ -21,8 +21,6 @@
 
 #include "Common.h"
 
-#include "libxafp_internal.h"
-
 
 // Context Handling
 //////////////////////////////////////
@@ -172,13 +170,16 @@ xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath)
 }
 
 // TODO: Get rid of the extra layer here...
-xafp_node_handle xafp_next(xafp_node_iterator iter)
+xafp_node_info* xafp_next(xafp_node_iterator iter)
 {
   if (!iter)
     return NULL;
   
   _fs_node_iterator* pIter = (_fs_node_iterator*)iter;
-  return (_fs_node*) pIter->iter->MoveNext();
+  CNodeParams* pNode = pIter->iter->MoveNext();
+  if (pNode)
+    return pNode->GetInfo();
+  return NULL;
 }
 
 void xafp_free_iter(xafp_node_iterator iter)
@@ -193,6 +194,44 @@ void xafp_free_iter(xafp_node_iterator iter)
 
 // File I/O
 //////////////////////////////////////
+int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
+{
+  if (!hnd || !pPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  int pos = path.find('/');
+  std::string volume = path.substr(0, pos);
+  int volId = xafp_find_volume_id(hnd, volume.c_str());
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    CNodeParams* pParams = NULL;
+    if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams))
+    {
+      // TODO: Maybe just call Exists() if caller does not provide stat buffer
+      if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
+      {
+        xafp_node_info* pInfo = pParams->GetInfo();
+        pStat->st_dev = volId; // Substitute volume for device
+        pStat->st_ino = pInfo->nodeId;
+        pStat->st_mode = (pInfo->isDirectory ? 0x0040000 : 0x0100000) | AFPRightsToUnixRights(pInfo->unixPrivs.userRights);
+        pStat->st_nlink = 0; ////////
+        pStat->st_uid = pInfo->unixPrivs.userId;
+        pStat->st_gid = pInfo->unixPrivs.groupId;
+        pStat->st_rdev = 0;///////
+        pStat->st_size = (pInfo->isDirectory ? 0 : pInfo->fileInfo.dataForkLen);
+        pStat->st_atime = pInfo->modDate;
+        pStat->st_mtime = pInfo->modDate;
+        pStat->st_ctime = pInfo->createDate;
+      }
+      return 0;
+    }
+    return -3;
+  }
+  return -2;
+}
 
 // Function: xafp_open_file
 // Returns: Handle on success (> 0), error code on failure (< 0)
@@ -219,7 +258,6 @@ xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_
     else 
       return -2;
   }
-  
   return -3;
 }
 

@@ -29,20 +29,22 @@
 #include "AFPClient.h"
 #include "AFPProto.h"
 
+// TODO: List
+// - Improve string/path handling. There is a lot of useless copying going on...
+
 // AFP File and Directory Parameter Handling
 /////////////////////////////////////////////////////////////////////////////////
 // Node dates are represented by the number of seconds since '01/01/2000 00:00:00.0 UTC'
 #define AFPTimeToTime_t(t) (t + ((2000 - 1970) * 365 * 86400) + (7 * 86400)) // Adjust for differences in epoch, including leap years
 
-CNodeParams::CNodeParams() :
-  m_pName(NULL)
+CNodeParams::CNodeParams()
 {
-  // TODO: Initialize remaining members
+  memset(&m_Info, 0, sizeof(m_Info));
 }
 
 CNodeParams::~CNodeParams()
 {
-  free(m_pName);
+  free(m_Info.name);
 }
 
 int CNodeParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
@@ -51,27 +53,28 @@ int CNodeParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   
   if (bitmap & kFPAttributeBit)
   {
-    m_Attributes = ntohs(*(uint16_t*)p);
+    m_Info.attributes = ntohs(*(uint16_t*)p);
     p += sizeof(uint16_t);
   }
   if (bitmap & kFPParentDirIDBit)
   {
-    m_ParentId = ntohl(*(uint32_t*)p);
+    m_Info.parentId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
+  // TODO: Read server time at login and adjust all dates
   if (bitmap & kFPCreateDateBit)
   {
-    m_CreateDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
+    m_Info.createDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPModDateBit)
   {
-    m_ModDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
+    m_Info.modDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPBackupDateBit)
   {
-    m_BackupDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
+    m_Info.backupDate = AFPTimeToTime_t(ntohl(*(uint32_t*)p));
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPFinderInfoBit)
@@ -84,7 +87,7 @@ int CNodeParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
     p += (*p + 1); // Skip the string. We are using the UTF8 name.
   if (bitmap & kFPNodeIDBit)
   {
-    m_NodeId = ntohl(*(uint32_t*)p);
+    m_Info.nodeId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   
@@ -95,7 +98,7 @@ CDirParams::CDirParams(uint32_t bitmap, uint8_t* pData, uint32_t size) :
   CNodeParams()
 {
   Parse(bitmap, pData, size);
-  m_IsDirectory = true;
+  m_Info.isDirectory = true;
 }
 
 int CDirParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
@@ -111,22 +114,22 @@ int CDirParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   uint8_t* p = pData + offset;
   if (bitmap & kFPOffspringCountBit)
   {
-    m_OffspringCount = ntohs(*(uint16_t*)p);
+    m_Info.dirInfo.offspringCount = ntohs(*(uint16_t*)p);
     p += sizeof(uint16_t);
   }
   if (bitmap & kFPOwnerIDBit)
   {
-    m_OwnerId = ntohl(*(uint32_t*)p);
+    m_Info.dirInfo.ownerId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPGroupIDBit)
   {
-    m_GroupId = ntohl(*(uint32_t*)p);
+    m_Info.dirInfo.groupId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPAccessRightsBit)
   {
-    m_AccessRights = ntohl(*(uint32_t*)p);
+    m_Info.dirInfo.accessRights = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   
@@ -140,23 +143,28 @@ int CDirParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
     pName += sizeof(uint32_t);
     uint16_t len = ntohs(*((uint16_t*)pName));
     pName += sizeof(uint16_t);
-    m_pName = (char*)malloc(len + 1);
-    memcpy(m_pName, pName, len);
-    m_pName[len] = '\0'; // NULL-terminate the string
+    m_Info.name = (char*)malloc(len + 1);
+    memcpy(m_Info.name, pName, len);
+    m_Info.name[len] = '\0'; // NULL-terminate the string
     p += sizeof (uint16_t); // The actual name is stored at an offset, so we only 'consume' one byte
     
     p += sizeof (uint32_t); // FIXME: There is padding in these packets. Why?
   }
-  
+  else // Make sure there is at least something here
+  {
+    m_Info.name = (char*)malloc(1);
+    m_Info.name[0] = '\0';
+  }
+
   if (bitmap & kFPUnixPrivsBit)
   {
-    m_UnixPrivs.userId = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.userId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.groupId = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.groupId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.perms = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.perms = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.userRights = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.userRights = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
   }
   
@@ -167,7 +175,7 @@ CFileParams::CFileParams(uint32_t bitmap, uint8_t* pData, uint32_t size) :
   CNodeParams()
 {
   Parse(bitmap, pData, size);
-  m_IsDirectory = false;
+  m_Info.isDirectory = false;
 }
 
 int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
@@ -183,23 +191,23 @@ int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   uint8_t* p = pData + offset;
   if (bitmap & kFPDataForkLenBit)
   {
-    m_DataForkLen = ntohl(*(uint32_t*)p);
+    m_Info.fileInfo.dataForkLen = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPRsrcForkLenBit)
   {
-    m_ResourceForkLen = ntohl(*(uint32_t*)p);
+    m_Info.fileInfo.resourceForkLen = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t);
   }
   if (bitmap & kFPExtDataForkLenBit)
   {
     // TODO: Clean-up, and skip if 32-bit value is less-than 4GB
 #ifdef BIG_ENDIAN
-    uint32_t* pb = (uint32_t*)&m_DataForkLen;
+    uint32_t* pb = (uint32_t*)&m_Info.fileInfo.dataForkLen;
     pb[0] = ntohl(*((uint32_t*)(p + sizeof(uint32_t))));
     pb[1] = ntohl(*(uint32_t*)p);
 #else
-    memcpy(&m_DataForkLen, p, sizeof(m_DataForkLen));
+    memcpy(&m_Info.fileInfo.dataForkLen, p, sizeof(m_Info.fileInfo.dataForkLen));
 #endif
     p += sizeof(uint64_t);
   }
@@ -213,9 +221,9 @@ int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
     pName += sizeof(uint32_t);
     uint16_t len = ntohs(*((uint16_t*)pName));
     pName += sizeof(uint16_t);
-    m_pName = (char*)malloc(len + 1);
-    memcpy(m_pName, pName, len);
-    m_pName[len] = '\0'; // NULL-terminate the string
+    m_Info.name = (char*)malloc(len + 1);
+    memcpy(m_Info.name, pName, len);
+    m_Info.name[len] = '\0'; // NULL-terminate the string
     p += sizeof (uint16_t); // The actual name is stored at an offset, so we only 'consume' one byte
     
     p += sizeof (uint32_t); // FIXME: There is padding in these packets. Why?
@@ -224,23 +232,23 @@ int CFileParams::Parse(uint32_t bitmap, uint8_t* pData, uint32_t size)
   {
     // TODO: Clean-up, and skip if 32-bit value is less-than 4GB
 #ifdef BIG_ENDIAN
-    uint32_t* pb = (uint32_t*)&m_ResourceForkLen;
+    uint32_t* pb = (uint32_t*)&m_Info.fileInfo.resourceForkLen;
     pb[0] = ntohl(*((uint32_t*)(p + sizeof(uint32_t))));
     pb[1] = ntohl(*(uint32_t*)p);
 #else
-    memcpy(&m_ResourceForkLen, p, sizeof(m_ResourceForkLen));
+    memcpy(&m_Info.fileInfo.resourceForkLen, p, sizeof(m_Info.fileInfo.resourceForkLen));
 #endif
     p += sizeof(uint64_t);
   }
   if (bitmap & kFPUnixPrivsBit)
   {
-    m_UnixPrivs.userId = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.userId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.groupId = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.groupId = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.perms = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.perms = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
-    m_UnixPrivs.userRights = ntohl(*(uint32_t*)p);
+    m_Info.unixPrivs.userRights = ntohl(*(uint32_t*)p);
     p += sizeof(uint32_t); // Would it be just a little better to use offsets?
   }  
   return (p - pData);
@@ -272,8 +280,6 @@ CAFPNodeList::Iterator::Iterator(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t 
 {
   m_pData = ((uint8_t*)pBuf->GetData()) + 6;
   m_pEnd = m_pData + pBuf->GetDataLen() - 6;
-  
-  //m_pCurrent = MoveNext(); // Parse the first node
 };
 
 CNodeParams* CAFPNodeList::Iterator::MoveNext()
@@ -428,11 +434,7 @@ int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
   reqBuf.Write((uint16_t)NULL); // File Bitmap
   uint16_t bitmap = kFPNodeIDBit;
   reqBuf.Write((uint16_t)bitmap); // Directory Bitmap
-  reqBuf.Write((uint8_t)3); // kFPUTF8Name
-  reqBuf.Write((uint32_t)0x08000103);
-  uint16_t nameLen = strlen(pName);
-  reqBuf.Write((uint16_t)nameLen); // Name Length
-  reqBuf.Write((void*)pName, nameLen);
+  reqBuf.WriteUTF8(pName); // kFPUTF8Name
 
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
@@ -446,7 +448,7 @@ int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
     if (isDir)
     {
       CDirParams params(bitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
-      return params.GetNodeId();
+      return params.GetInfo()->nodeId;
     }
   }  
   return 0; // TODO: Need error codes for callers...
@@ -474,10 +476,8 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID)
   reqBuf.Write((uint16_t)20); // Max Results
   reqBuf.Write((uint32_t)1); // Start Index
   reqBuf.Write((uint32_t)5280); // Max Reply Size
-  reqBuf.Write((uint8_t)3); // kFPUTF8Name
-  reqBuf.Write((uint32_t)0x08000103); // Unknown
-  reqBuf.Write((uint16_t)0); // Name Length
-  
+  reqBuf.WriteUTF8(NULL);
+
   CDSIBuffer* pReplyBuf = new CDSIBuffer();
   uint32_t err = SendCommand(reqBuf, pReplyBuf);
   if (err == kNoError)
@@ -496,6 +496,62 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID)
   }
 }
 
+int CAFPSession::Stat(int volumeId, const char* pPath, CNodeParams** pParams)
+{
+  if (!IsLoggedIn())
+    return kFPUserNotAuth;
+  
+  std::string path(pPath);
+  int pos = path.rfind('/');
+  
+  int dirId = GetDirectory(volumeId, path.substr(0, pos).c_str());
+  
+  std::string fileName = path.substr(pos+1);
+  
+  CDSIBuffer reqBuf(13 + 4 + 1 + fileName.length());
+  reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
+  reqBuf.Write((uint8_t)0); // Pad
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)dirId);
+  
+  uint16_t fileBitmap = NULL;
+  uint16_t dirBitmap = NULL;
+  if (pParams)
+  {
+    fileBitmap = kFPNodeIDBit | kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPExtDataForkLenBit;;
+    dirBitmap = kFPNodeIDBit | kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPOffspringCountBit;
+  }
+  reqBuf.Write((uint16_t)fileBitmap);
+  reqBuf.Write((uint16_t)dirBitmap);
+  reqBuf.WriteUTF8(fileName.c_str());
+    
+  CDSIBuffer replyBuf;
+  uint32_t err = SendCommand(reqBuf, &replyBuf);
+  if (err == kNoError)
+  {
+    if (pParams)
+    {
+      // TODO: Validate returned bitmap vs provided one
+      replyBuf.Read16(); // Skip File Bitmap (we already specified)
+      replyBuf.Read16(); // Skip Directory Bitmap (we already specified)
+      bool isDir = replyBuf.Read8() & 0x80; // Directory bit + pad(7bits)
+      replyBuf.Read8(); // Pad
+      if (isDir)
+      {
+        *pParams = new CDirParams();      
+        ((CDirParams*)(*pParams))->Parse(dirBitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
+      }
+      else
+      {
+        *pParams = new CFileParams();
+        ((CFileParams*)(*pParams))->Parse(fileBitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
+      }
+    }
+    return 0; // TODO: Need error codes for callers...  
+  }
+  return -1;
+}
+
 int CAFPSession::OpenFile(int volumeId, int dirId, const char* pName)
 {
   if (!IsLoggedIn())
@@ -503,16 +559,14 @@ int CAFPSession::OpenFile(int volumeId, int dirId, const char* pName)
 
   uint16_t nameLen = strlen(pName);
   CDSIBuffer reqBuf(17 + nameLen + 1);
+  
   reqBuf.Write((uint8_t)FPOpenFork); // Command
   reqBuf.Write((uint8_t)0); // Flag (File Fork)
   reqBuf.Write((uint16_t)volumeId);
   reqBuf.Write((uint32_t)dirId);
   reqBuf.Write((uint16_t)0); // No need to return any parameters
   reqBuf.Write((uint16_t)kFPForkRead); // Open read-only
-  reqBuf.Write((uint8_t)3); // kFPUTF8Name
-  reqBuf.Write((uint32_t)0x08000103);
-  reqBuf.Write((uint16_t)nameLen); // Name Length
-  reqBuf.Write((void*)pName, nameLen);
+  reqBuf.WriteUTF8(pName);
   
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
@@ -523,6 +577,50 @@ int CAFPSession::OpenFile(int volumeId, int dirId, const char* pName)
     return forkId;
   } 
   return 0;
+}
+
+int CAFPSession::Create(int volumeId, int parentId, const char* pName, bool dir /*=false*/)
+{
+  if (!IsLoggedIn())
+    return 0;
+  
+  uint16_t nameLen = strlen(pName);
+  CDSIBuffer reqBuf(15 + nameLen + 1);
+  
+  reqBuf.Write((uint8_t)(dir ? FPCreateDir : FPCreateFile)); // Command
+  reqBuf.Write((uint8_t)(dir ? 0 : 1)); // Pad/Flag
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)parentId);
+  reqBuf.WriteUTF8(pName);
+  
+  CDSIBuffer replyBuf;
+  int32_t err = SendCommand(reqBuf, dir ? &replyBuf : NULL);
+  if (err == kNoError)
+  {
+    if (dir)
+      return replyBuf.Read32();
+    else
+      return 0;
+  }
+  return err;
+}
+
+int CAFPSession::Delete(int volumeId, int parentId, const char* pName)
+{
+  if (!IsLoggedIn())
+    return 0;
+  
+  uint16_t nameLen = strlen(pName);
+  CDSIBuffer reqBuf(15 + nameLen + 1);
+  
+  reqBuf.Write((uint8_t)FPDelete); // Command
+  reqBuf.Write((uint8_t)0); // Pad
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)parentId);
+  reqBuf.WriteUTF8(pName); // kFPUTF8Name
+  
+  int32_t err = SendCommand(reqBuf);
+  return err;
 }
 
 void CAFPSession::CloseFile(int forkId)
@@ -557,20 +655,18 @@ int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
   return 0;
 }
 
-bool CAFPSession::ParseFileDirParams(CDSIBuffer* pBuffer)
-{
-  return false;
-}
-
-bool CAFPSession::ParseDirParams(uint16_t bitmap, CDSIBuffer* pBuffer, CDirParams& params)
-{
-  return false;
-}
-
-bool CAFPSession::ParseFileParams(uint16_t bitmap, CDSIBuffer* pBuffer, CFileParams& params)
-{
-  return false;
-}
+//int CAFPSession::WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
+//{
+//  CDSIBuffer reqBuf(20);
+//  reqBuf.Write((uint8_t)FPWriteExt); // Command
+//  reqBuf.Write((uint8_t)0); // Flag (Offset from start of file)
+//  reqBuf.Write((uint16_t)forkId);
+//  reqBuf.Write((uint64_t)offset); // Offset
+//  reqBuf.Write((uint64_t)len); // Bytes to Write
+//  
+//  
+//  
+//}
 
 /*
  // http://developer.apple.com/library/mac/#documentation/Networking/Conceptual/AFP/AFPSecurity/AFPSecurity.html

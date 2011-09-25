@@ -19,19 +19,19 @@
  *
  */
 
-#include "Logging.h"
+#include "Common.h"
 #include <stdio.h>
 
-XafpLogFuncPtr xafplog = printf;
+xafp_log_func_ptr xafplog = printf;
 int g_xafplevel = XAFP_LOG_LEVEL_ERROR;
 
-void XafpSetLogFunc(XafpLogFuncPtr func)
+void xafp_set_log_func(xafp_log_func_ptr func)
 {
   if (func)
     xafplog = func;
 }
 
-void XafpSetLogLevel(int level)
+void xafp_set_log_level(int level)
 {
   g_xafplevel = level;
 }

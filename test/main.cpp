@@ -1,8 +1,6 @@
-#include <iostream>
 
+#include <iostream>
 #include "../include/libxafp.h"
-#include "../src/AFPClient.h"
-#include "../src/AFPProto.h"
 
 void cp(const char* path, const char* dest, const char* username, const char* pass)
 {
@@ -57,37 +55,36 @@ void ls(const char* path, const char* username, const char* pass)
   if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
   {
     xafp_node_iterator iter = xafp_get_dir_iter(ctx, path);
-    xafp_node_handle node = xafp_next(iter);
-    while(node)
+    xafp_node_info* pNode = xafp_next(iter);
+    while(pNode)
     {
-      CNodeParams* pParams = (CNodeParams*)node;
-      if (!(pParams->GetAttributes() & kFPInvisibleBit))
+      if (!(pNode->attributes & xafp_node_att_hidden))
       {
-        uint32_t perms = pParams->GetPermissions();
-        time_t modTime = pParams->GetModDate();
+        uint32_t perms = pNode->unixPrivs.perms;
+        time_t modTime = pNode->modDate;
         char timeString[32];
         strncpy(timeString, ctime(&modTime), 32);
         timeString[strlen(timeString) - 1] = '\0';
         printf ("%s%s%s%s%s%s%s%s%s%s %s %d %d %d %s %s\n", 
-                pParams->IsDirectory() ? "d" : "-",
-                (perms & kRPOwner) ? "r" : "-",
-                (perms & kWROwner) ? "w" : "-",
-                (perms & kSPGroup) ? "x" : "-",
-                (perms & kRPGroup) ? "r" : "-",
-                (perms & kWRGroup) ? "w" : "-",
-                (perms & kSPGroup) ? "x" : "-",
-                (perms & kRPOther) ? "r" : "-",
-                (perms & kWROther) ? "w" : "-",
-                (perms & kSPOther) ? "x" : "-",
+                pNode->isDirectory ? "d" : "-",
+                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_read)) ? "r" : "-",
+                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_write)) ? "w" : "-",
+                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_exec)) ? "x" : "-",
+                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_read)) ? "r" : "-",
+                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_write)) ? "w" : "-",
+                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_exec)) ? "x" : "-",
+                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_read)) ? "r" : "-",
+                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_write)) ? "w" : "-",
+                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_exec)) ? "x" : "-",
                 "-",
-                pParams->GetUserId(),
-                pParams->GetGroupId(),
-                pParams->IsDirectory() ? 0 : 0,
+                pNode->unixPrivs.userId,
+                pNode->unixPrivs.groupId,
+                pNode->isDirectory ? 0 : 0,
                 timeString,
-                pParams->GetName()
+                pNode->name
                 );
       }
-      node = xafp_next(iter);
+      pNode = xafp_next(iter);
     }
     xafp_free_iter(iter);
     xafp_unmount(ctx, "Media");
@@ -99,7 +96,7 @@ void ls(const char* path, const char* username, const char* pass)
 
 int main (int argc, char * const argv[]) 
 {
-  XafpSetLogLevel(XAFP_LOG_LEVEL_INFO);
+  xafp_set_log_level(XAFP_LOG_LEVEL_INFO);
   char secret[32];
   FILE* fsecret = fopen(argv[1], "r");
   fread(secret, 1, sizeof(secret), fsecret);

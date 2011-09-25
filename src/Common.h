@@ -23,7 +23,12 @@
 #include <sys/types.h>
 #include <string>
 #include <vector>
-#include <map>
 
-#include "Logging.h"
 #include "Utils.h"
+#include "libxafp_internal.h"
+
+// TODO: Allow for totally disabling this
+extern xafp_log_func_ptr xafplog;
+extern int g_xafplevel;
+#define XAFP_LOG(level,fmt, ...) if (g_xafplevel & level) xafplog(fmt "\n", __VA_ARGS__)
+#define XAFP_LOG_0(level,fmt) if (g_xafplevel & level) xafplog(fmt "\n")

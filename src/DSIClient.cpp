@@ -112,6 +112,27 @@ void CDSIBuffer::Write(const char* pVal)
   m_pIndex+=len;
 }
 
+void CDSIBuffer::WriteUTF8(const char* pVal)
+{
+  uint16_t len = 0;
+  if (pVal)
+    len = strlen(pVal);
+
+  CONFIRM_BUF_SIZE(sizeof(len) + len + 5);
+
+  m_pIndex[0] = 3; // kFPUTF8Name
+  *((uint32_t*)++m_pIndex) = htonl(0x08000103); // 'Unknown'
+  m_pIndex += sizeof(uint32_t);
+
+  *((uint16_t*)m_pIndex) = htons(len);
+  m_pIndex+=sizeof(uint16_t);
+  
+  if (pVal)
+    memcpy(m_pIndex, pVal, len);
+  
+  m_pIndex+=len;
+}
+
 uint8_t CDSIBuffer::Read8()
 {
   uint8_t val = *((uint8_t*)m_pIndex);
@@ -347,7 +368,7 @@ int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=N
   if (!IsOpen())
   {
     XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Attempting to use closed session");
-    return false;
+    return kDSISessionClosed;
   }
   
   // Add Request to map so receive handler can notify us
@@ -496,47 +517,57 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
           XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Received Reply - Message:%s, RequestId:%d, result:%d", DSIProtoCommandToString(hdr.command), hdr.requestID, hdr.errorCode);
           // Find the request in our request map
           pRequest = RemoveRequest(hdr.requestID);
-          pBuffer = pRequest->pResponseBuffer;
-          // TODO: Handle case where we don't find what we expected (maybe client timed-out...) - another use for buffer 'skip' code
-          
-          // Store the result code
-          pRequest->result = hdr.errorCode;
-          
-          // Tranfer data into caller-supplied buffer, if one was provided
-          // If not, they did not expect any data back, just a result code
-          // TODO: Make sure all data in the message is read/skipped before moving on, to prevent 
-          // clogging-up the pipe...s
-          if (hdr.totalDataLength && pBuffer)
+          if (pRequest)
           {
-            pBuffer->Resize(hdr.totalDataLength); // Make sure we have somewhere to put the data (including possible ongoing reads)
-            int bytesRead = reader.Read(pBuffer->GetData(), hdr.totalDataLength);
-            if (bytesRead > 0) // All OK
-            {  
-              pBuffer->SetDataLen(pBuffer->GetDataLen() + bytesRead); // Size so far (might not be final size)
-              
-              // If the requested reply block is larger than the underlying layer's PDU,
-              // we will have to wait for multiple packets. These will be sent serially, with no
-              // other interleaved requests/replies. To handle this, we need to either store the
-              // current reply context and continue it on the next callback, or invoke a sync read,
-              // since we know the next block of data is sequential.
-              // NOTE: We are trusting the server re: the data length here. If it is wrong, we will 
-              // wait forever... There is no other way to know when an operation has failed...
-              // (except the underlying protocol...)
-              // TODO: We should probably make sure the result code is success before we plan to read forever...
-              if (bytesRead < hdr.totalDataLength)
-              {
-                // Setup and store the request context
-                pRequest->totalBytes = hdr.totalDataLength;
-                pRequest->bytesRemaining = hdr.totalDataLength - bytesRead;
-                pRequest->pieces = 1;
-                XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Began receiving multi-PDU read response (expected: %d, read: %d)",pRequest->totalBytes, pRequest->bytesRemaining);
-                m_pOngoingReply = pRequest; 
-                return; // Wait for more data before signaling requestor...
+            pBuffer = pRequest->pResponseBuffer;
+            // TODO: Handle case where we don't find what we expected (maybe client timed-out...) - another use for buffer 'skip' code
+            
+            // Store the result code
+            pRequest->result = hdr.errorCode;
+            
+            // Tranfer data into caller-supplied buffer, if one was provided
+            // If not, they did not expect any data back, just a result code
+            // TODO: Make sure all data in the message is read/skipped before moving on, to prevent 
+            // clogging-up the pipe...s
+            if (hdr.totalDataLength && pBuffer)
+            {
+              pBuffer->Resize(hdr.totalDataLength); // Make sure we have somewhere to put the data (including possible ongoing reads)
+              int bytesRead = reader.Read(pBuffer->GetData(), hdr.totalDataLength);
+              if (bytesRead > 0) // All OK
+              {  
+                pBuffer->SetDataLen(pBuffer->GetDataLen() + bytesRead); // Size so far (might not be final size)
+                
+                // If the requested reply block is larger than the underlying layer's PDU,
+                // we will have to wait for multiple packets. These will be sent serially, with no
+                // other interleaved requests/replies. To handle this, we need to either store the
+                // current reply context and continue it on the next callback, or invoke a sync read,
+                // since we know the next block of data is sequential.
+                // NOTE: We are trusting the server re: the data length here. If it is wrong, we will 
+                // wait forever... There is no other way to know when an operation has failed...
+                // (except the underlying protocol...)
+                // TODO: We should probably make sure the result code is success before we plan to read forever...
+                if (bytesRead < hdr.totalDataLength)
+                {
+                  // Setup and store the request context
+                  pRequest->totalBytes = hdr.totalDataLength;
+                  pRequest->bytesRemaining = hdr.totalDataLength - bytesRead;
+                  pRequest->pieces = 1;
+                  XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Began receiving multi-PDU read response (expected: %d, read: %d)",pRequest->totalBytes, pRequest->bytesRemaining);
+                  m_pOngoingReply = pRequest; 
+                  return; // Wait for more data before signaling requestor...
+                }
               }
             }
+            // Signal waiting requestor
+            pRequest->pEvent->Set();
           }
-          // Signal waiting requestor
-          pRequest->pEvent->Set();
+          else
+          {
+            // TODO: Need a better flush/skip/seek method
+            void* p = malloc(hdr.totalDataLength);
+            reader.Read(p, hdr.totalDataLength);
+            free(p);
+          }
           break;
         default:
           // TODO: Skip payload data and try to recover

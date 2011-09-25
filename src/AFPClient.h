@@ -31,31 +31,9 @@ public:
   CNodeParams();
   virtual ~CNodeParams();
   int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-  inline uint32_t GetNodeId() {return m_NodeId;}
-  inline uint32_t GetUserId() {return m_UnixPrivs.userId;}
-  inline uint32_t GetGroupId() {return m_UnixPrivs.userId;}
-  inline uint32_t GetPermissions() {return m_UnixPrivs.userRights;}
-  inline const char* GetName() {return (m_pName == NULL) ? "" : m_pName;}
-  inline const time_t GetModDate() {return (time_t)m_ModDate;}
-  inline uint16_t GetAttributes() {return m_Attributes;}
-  inline bool IsDirectory() {return m_IsDirectory;}
+  xafp_node_info* GetInfo() {return &m_Info;}
 protected:
-  bool m_IsDirectory;
-  uint16_t m_Attributes;
-  uint32_t m_ParentId;
-  // TODO: Read server time at login and adjust all dates
-  time_t m_CreateDate;
-  time_t m_ModDate;
-  time_t m_BackupDate;
-  uint32_t m_NodeId;
-  char* m_pName;
-  struct
-  {
-    uint32_t userId;
-    uint32_t groupId;
-    uint32_t perms;
-    uint32_t userRights;
-  } m_UnixPrivs;
+  xafp_node_info m_Info;
 };
 
 // AFP File and Directory Parameter Handling
@@ -63,27 +41,17 @@ protected:
 class CDirParams : public CNodeParams
 {
 public:
-  CDirParams() : CNodeParams() {}
+  CDirParams() : CNodeParams() {m_Info.isDirectory = true;}
   CDirParams(uint32_t bitmap, uint8_t* pData, uint32_t size);
   int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-  inline uint32_t GetOffspringCount() {return m_OffspringCount;}
-protected: 
-  uint16_t m_OffspringCount;
-  uint32_t m_OwnerId;
-  uint32_t m_GroupId;
-  // TODO: Do we need this, or can we just use UNIX privs?
-  uint32_t m_AccessRights;
 };
 
 class CFileParams : public CNodeParams
 {
 public:
-  CFileParams() : CNodeParams() {}
+  CFileParams() : CNodeParams() {m_Info.isDirectory = false;}
   CFileParams(uint32_t bitmap, uint8_t* pData, uint32_t size);
   int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-protected: 
-  uint64_t m_DataForkLen;
-  uint64_t m_ResourceForkLen;
 };
 
 class CAFPNodeList
@@ -135,16 +103,19 @@ public:
   
   int OpenFile(int volumeId, int dirId, const char* pName);
   void CloseFile(int forkId);
-  
+
+  int Create(int volumeId, int parentId, const char* pName, bool dir = false);
+  int Delete(int volumeId, int parentId, const char* pName);
+             
   int ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len);
+  int WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len);
+  
+  int Stat(int volumeId, const char* pPath, CNodeParams** ppParams);
+  int Exists(int volumeId, const char* pPath) {return Stat(volumeId, pPath, NULL);}
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(const char* pUsername, const char* pPassword);
   int OpenDir(int volumeID, int parentID, const char* pName);
-  
-  bool ParseFileDirParams(CDSIBuffer* pBuffer);
-  bool ParseDirParams(uint16_t bitmap, CDSIBuffer* pBuffer, CDirParams& params);
-  bool ParseFileParams(uint16_t bitmap, CDSIBuffer* pBuffer, CFileParams& params);
-  
+   
   bool m_LoggedIn;
 };

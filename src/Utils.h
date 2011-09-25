@@ -24,7 +24,6 @@
   memcpy(_dst,((char*)_src + 1),*((uint8_t*)_src)); \
   _dst[*((uint8_t*)_src)] = '\0';
 
-
 enum
 {
   kNoError = 0,
