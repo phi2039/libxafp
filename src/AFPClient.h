@@ -98,7 +98,7 @@ public:
   void CloseVolume(int volId);
   bool IsLoggedIn() {return m_LoggedIn;}
   
-  int GetDirectory(int volumeID, const char* pPath);
+  int GetDirectory(int volumeId, const char* pPath, int parentId = 2);
   int GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID);
   
   int OpenFile(int volumeId, int dirId, const char* pName);
@@ -115,7 +115,6 @@ public:
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(const char* pUsername, const char* pPassword);
-  int OpenDir(int volumeID, int parentID, const char* pName);
-   
+  
   bool m_LoggedIn;
 };

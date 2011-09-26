@@ -401,46 +401,39 @@ void CAFPSession::CloseVolume(int volId)
 
 // The Directory ID of the root is always 2
 // TODO: Is this thread-safe?
-// TODO: How do we specify the whole path at once?
-int CAFPSession::GetDirectory(int volumeID, const char* pPath)
+int CAFPSession::GetDirectory(int volumeId, const char* pPath, int parentId /*=2*/)
 {
-  char* pBuf = (char*)malloc(strlen(pPath) + 1);
-  strcpy(pBuf, pPath);
-  char* pElement = strtok(pBuf, "/");
-  int parentId = 2;
-  int dirId = 0;
-  // Recurse into directory tree
-  while(pElement)
+  // AFP path specifiers use NULL-chars as separators
+  // Replace all the slashes with NULLs
+  int len = strlen(pPath);
+  char* pBuf = (char*)malloc(len+1);
+  memcpy(pBuf, pPath, len);
+  pBuf[len] = 0;
+  for (int i = 0; i < len; i++)
   {
-    dirId = OpenDir(volumeID, parentId, pElement);
-    pElement = strtok(NULL, "/");
-    parentId = dirId;
+    if (pBuf[i] == '/')
+      pBuf[i] = '\0';
   }
-  free(pBuf);
   
-  return dirId;
-}
-
-int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
-{
-  if (!IsLoggedIn())
-    return 0;
-  
-  CDSIBuffer reqBuf(13 + 4 + 1 + strlen(pName));
+  CDSIBuffer reqBuf(13 + 4 + 1 + len + 1);
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
   reqBuf.Write((uint8_t)0); // Pad
-  reqBuf.Write((uint16_t)volumeID);
-  reqBuf.Write((uint32_t)parentID);
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)parentId); // Assume all references 
   reqBuf.Write((uint16_t)NULL); // File Bitmap
   uint16_t bitmap = kFPNodeIDBit;
   reqBuf.Write((uint16_t)bitmap); // Directory Bitmap
-  reqBuf.WriteUTF8(pName); // kFPUTF8Name
-
+  
+  reqBuf.Write((uint8_t)3); // kFPUTF8Name
+  reqBuf.Write((uint32_t)0x08000103); // 'Unknown'
+  reqBuf.Write((uint16_t)len);
+  reqBuf.Write((void*)pBuf, len);
+  free(pBuf);
+  
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
   if (err == kNoError)
   {
-    // TODO: Validate returned bitmap vs provided one
     replyBuf.Read16(); // Skip File Bitmap (we already specified)
     replyBuf.Read16(); // Skip Directory Bitmap (we already specified)
     bool isDir = replyBuf.Read8() & 0x80; // Directory bit + pad(7bits)
@@ -451,10 +444,10 @@ int CAFPSession::OpenDir(int volumeID, int parentID, const char* pName)
       return params.GetInfo()->nodeId;
     }
   }  
-  return 0; // TODO: Need error codes for callers...
+  return 0; // TODO: Need error codes for callers...  
 }
 
-int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID)
+int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, int dirId)
 {
   if (!IsLoggedIn())
     return kFPUserNotAuth;
@@ -467,8 +460,8 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID)
   // TODO: FPEnumerateExt2 requires AFPv3.1 - need to add support for FPEnumerateExt for AFPv3.0
   reqBuf.Write((uint8_t)FPEnumerateExt2); // Command
   reqBuf.Write((uint8_t)0); // Pad
-  reqBuf.Write((uint16_t)volumeID);
-  reqBuf.Write((uint32_t)dirID);
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)dirId);
   uint16_t fileBitmap = kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPExtDataForkLenBit;
   reqBuf.Write((uint16_t)fileBitmap); // File Bitmap
   uint16_t dirBitmap = kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPOffspringCountBit;
@@ -642,7 +635,6 @@ int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
   reqBuf.Write((uint64_t)offset); // Offset
   reqBuf.Write((uint64_t)len); // Bytes to Read
 
-  // TODO: implement stateful read tracking to allow callers to read incrementally
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
   if (err == kNoError)
