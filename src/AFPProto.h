@@ -52,7 +52,7 @@ enum
   FPEnumerateExt2 = 68,
   //  FPExchangeFiles
   //  FPFlush
-  //  FPFlushFork
+  FPFlushFork = 11,
   //  FPGetACL
   //  FPGetAPPL
   //  FPGetAuthMethods

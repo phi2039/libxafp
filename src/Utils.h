@@ -32,3 +32,9 @@ enum
 
 const char* DSIProtoCommandToString(int id);
 const char* AFPProtoCommandToString(int id);
+
+class CAFPPath
+{
+public:
+protected:
+};

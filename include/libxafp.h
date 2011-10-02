@@ -26,8 +26,8 @@
 
 typedef struct _client_context* xafp_client_handle;
 typedef struct _fs_node_iterator* xafp_node_iterator;
-//typedef struct _fs_node* xafp_node_handle;
 typedef int xafp_file_handle;
+typedef struct _session_pool* xafp_session_pool_handle;
 
 // TODO: define common error codes
 
@@ -127,7 +127,6 @@ struct xafp_node_info
     }dirInfo;
     struct
     {
-      // TODO: Do we need this, or can we just use UNIX privs?
       uint64_t dataForkLen;
       uint64_t resourceForkLen;
     }fileInfo;
@@ -150,12 +149,20 @@ void xafp_free_iter(xafp_node_iterator iter);
 // Path spec includes share/volume name
 int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat);
 
-xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_open_flags flags);
+xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, int flags);
 int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len);
+int xafp_write_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len, bool flush = false);
 void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file);
 
-// xafp_create_file
-// xafp_create_dir
+// Path spec includes share/volume name
+int xafp_create_dir(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
+int xafp_create_file(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
 
-// xafp_remove_file
-// xafp_remove_dir
+int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
+
+// Session Pool Definition
+///////////////////////////////////////////////////////
+xafp_session_pool_handle xafp_create_session_pool(int timeout = 300);
+xafp_client_handle xafp_get_context(xafp_session_pool_handle pool, const char* pServer, const char* pUser=NULL, const char* pPass=NULL, unsigned int port=548);
+void xafp_free_context(xafp_session_pool_handle pool, xafp_client_handle ctx);
+void xafp_destroy_session_pool(xafp_session_pool_handle pool);

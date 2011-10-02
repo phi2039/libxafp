@@ -7,7 +7,20 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
   xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
-  // TODO: Strip out volume name
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+
   if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
   {
     xafp_file_handle fileHandle = xafp_open_file(ctx, path, xafp_open_flag_read);
@@ -51,8 +64,21 @@ void ls(const char* path, const char* username, const char* pass)
   xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
-  // TODO: Strip out volume name
-  if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
   {
     xafp_node_iterator iter = xafp_get_dir_iter(ctx, path);
     xafp_node_info* pNode = xafp_next(iter);
@@ -60,26 +86,26 @@ void ls(const char* path, const char* username, const char* pass)
     {
       if (!(pNode->attributes & xafp_node_att_hidden))
       {
-        uint32_t perms = pNode->unixPrivs.perms;
+        uint32_t afpRights = pNode->unixPrivs.userRights;
         time_t modTime = pNode->modDate;
         char timeString[32];
         strncpy(timeString, ctime(&modTime), 32);
         timeString[strlen(timeString) - 1] = '\0';
-        printf ("%s%s%s%s%s%s%s%s%s%s %s %d %d %d %s %s\n", 
+        printf ("%s%s%s%s%s%s%s%s%s%s %s %d %d %dK %s %s\n", 
                 pNode->isDirectory ? "d" : "-",
-                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_read)) ? "r" : "-",
-                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_write)) ? "w" : "-",
-                (perms & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_exec)) ? "x" : "-",
-                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_read)) ? "r" : "-",
-                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_write)) ? "w" : "-",
-                (perms & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_exec)) ? "x" : "-",
-                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_read)) ? "r" : "-",
-                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_write)) ? "w" : "-",
-                (perms & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_exec)) ? "x" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_read)) ? "r" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_write)) ? "w" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OWNER(xafp_node_perms_exec)) ? "x" : "-",
+                (afpRights & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_read)) ? "r" : "-",
+                (afpRights & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_write)) ? "w" : "-",
+                (afpRights & MAKE_XAFP_PERMS_GROUP(xafp_node_perms_exec)) ? "x" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_read)) ? "r" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_write)) ? "w" : "-",
+                (afpRights & MAKE_XAFP_PERMS_OTHER(xafp_node_perms_exec)) ? "x" : "-",
                 "-",
                 pNode->unixPrivs.userId,
                 pNode->unixPrivs.groupId,
-                pNode->isDirectory ? 0 : 0,
+                pNode->isDirectory ? 0 : (uint32_t)(pNode->fileInfo.dataForkLen/1000),
                 timeString,
                 pNode->name
                 );
@@ -87,23 +113,150 @@ void ls(const char* path, const char* username, const char* pass)
       pNode = xafp_next(iter);
     }
     xafp_free_iter(iter);
-    xafp_unmount(ctx, "Media");
+    xafp_unmount(ctx, volume);
   }
   
   // Clean-up the session
   xafp_destroy_context(ctx);
 }
 
+void mkdir(const char* path, const char* username, const char* pass)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
+  {
+    xafp_create_dir(ctx, path);
+    xafp_unmount(ctx, volume);
+  }
+  
+  // Clean-up the session
+  xafp_destroy_context(ctx);  
+}
+
+void rm(const char* path, const char* username, const char* pass)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
+  {
+    xafp_remove(ctx, path);
+    xafp_unmount(ctx, volume);
+  }
+  
+  // Clean-up the session
+  xafp_destroy_context(ctx);  
+}
+
+void touch(const char* path, const char* username, const char* pass)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
+  {
+    xafp_create_file(ctx, path);
+    xafp_unmount(ctx, volume);
+  }
+}
+
+void cat(const char* path, void* pBuf, int len, const char* username, const char* pass, uint32_t offset=0)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
+  {
+    xafp_file_handle file = xafp_open_file(ctx, path, xafp_open_flag_read | xafp_open_flag_write);
+    if (file)
+    {
+      xafp_write_file(ctx, file, offset, pBuf, len);
+      xafp_close_file(ctx, file);
+    }
+    xafp_unmount(ctx, volume);
+  }
+  
+  // Clean-up the session
+  xafp_destroy_context(ctx);  
+}
+
+
 int main (int argc, char * const argv[]) 
 {
-  xafp_set_log_level(XAFP_LOG_LEVEL_INFO);
+  xafp_set_log_level(XAFP_LOG_LEVEL_INFO | XAFP_LOG_FLAG_DSI_PROTO);
   char secret[32];
   FILE* fsecret = fopen(argv[1], "r");
   fread(secret, 1, sizeof(secret), fsecret);
 
   ls("/Media/video/Movies/BRRip","chris",secret);
   
-  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
+  mkdir("/Media/video/Test/foo","chris",secret);  
+  rm("/Media/video/Test/foo","chris",secret);
+
+  rm("/Media/video/Test/bar.txt","chris",secret);
+  touch("/Media/video/Test/bar.txt","chris",secret);
+  char msg[] = "Hello World!\n";
+  cat("/Media/video/Test/bar.txt",msg, strlen(msg), "chris",secret);
+  
+//  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
   
   return 0;
 }

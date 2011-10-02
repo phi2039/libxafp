@@ -98,20 +98,20 @@ public:
   void CloseVolume(int volId);
   bool IsLoggedIn() {return m_LoggedIn;}
   
-  int GetDirectory(int volumeId, const char* pPath, int parentId = 2);
-  int GetNodeList(CAFPNodeList** ppList, int volumeID, int dirID);
+  int GetDirectoryId(int volumeId, const char* pPathSpec, int refId = 2);
+  int GetNodeList(CAFPNodeList** ppList, int volumeId, const char* pPathSpec, int refId = 2);
   
-  int OpenFile(int volumeId, int dirId, const char* pName);
-  void CloseFile(int forkId);
-
-  int Create(int volumeId, int parentId, const char* pName, bool dir = false);
-  int Delete(int volumeId, int parentId, const char* pName);
-             
+  int OpenFile(int volumeId, const char* pPathSpec, uint16_t mode = kFPForkRead, int refId = 2);
   int ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len);
   int WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len);
-  
-  int Stat(int volumeId, const char* pPath, CNodeParams** ppParams);
-  int Exists(int volumeId, const char* pPath) {return Stat(volumeId, pPath, NULL);}
+  int FlushFile(int forkId);
+  void CloseFile(int forkId);
+
+  int Create(int volumeId, const char* pPathSpec, bool dir = false, int refId = 2);
+  int Delete(int volumeId, const char* pPathSpec, int refId = 2);
+             
+  int Stat(int volumeId, const char* pPathSpec, CNodeParams** ppParams, int refId = 2);
+  int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(const char* pUsername, const char* pPassword);

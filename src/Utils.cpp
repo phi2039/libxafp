@@ -96,14 +96,16 @@ const char* AFPCommandNames[] = {
   "FPByteRangeLockExt", 
   "FPReadExt", // 60
   "FPWriteExt", // 61
-/*   afpGetAuthMethods=62,
-   afp_LoginExt=63,
-   afpGetSessionToken=64,
-   afpDisconnectOldSession=65,
-   afpEnumerateExt=66,
-   afpCatSearchExt = 67,
-   afpEnumerateExt2 = 68, afpGetExtAttr, afpSetExtAttr, 
-   afpRemoveExtAttr , afpListExtAttrs,
+  "FPGetAuthMethods",
+  "FPLoginExt",
+  "FPGetSessionToken",
+  "FPDisconnectOldSession",
+  "FPEnumerateExt",
+  "FPCatSearchExt",
+  "FPEnumerateExt2",
+  "FPGetExtAttr",
+  "FPSetExtAttr", 
+/*   afpRemoveExtAttr , afpListExtAttrs,
    afpZzzzz = 122,
    afpAddIcon=192,*/
   ""
@@ -118,7 +120,7 @@ const char* DSIProtoCommandToString(int id)
 
 const char* AFPProtoCommandToString(int id)
 {
-  if (id > 61 )
+  if (id > 70 )
     return "???";  
   return AFPCommandNames[id];
 }

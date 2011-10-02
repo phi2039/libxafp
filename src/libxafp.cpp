@@ -152,18 +152,14 @@ xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath)
   {
     _client_context* pCtx = (_client_context*)hnd;
     std::string dir = path.substr(pos);    
-    int dirId = pCtx->session->GetDirectory(volId, dir.c_str());
 
-    if (dirId > 0)
+    CAFPNodeList* pList = NULL;
+    if (pCtx->session->GetNodeList(&pList, volId, path.c_str() + pos) == kNoError)
     {
-      CAFPNodeList* pList = NULL;
-      if (pCtx->session->GetNodeList(&pList, volId, dirId) == kNoError)
-      {
-        _fs_node_iterator* pIter = new _fs_node_iterator;
-        pIter->list = pList;
-        pIter->iter = pList->GetIterator();
-        return (xafp_node_iterator)pIter;
-      }
+      _fs_node_iterator* pIter = new _fs_node_iterator;
+      pIter->list = pList;
+      pIter->iter = pList->GetIterator();
+      return (xafp_node_iterator)pIter;
     }
   }
   return NULL;
@@ -199,7 +195,7 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
   if (!hnd || !pPath)
     return -1;
   
-  // TODO: Make this more reliable and complete
+  // TODO: Make this more reliable and complete (implement wrapper class?)
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
@@ -208,7 +204,7 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
   {
     _client_context* pCtx = (_client_context*)hnd;
     CNodeParams* pParams = NULL;
-    if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams))
+    if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams)) // Path does NOT include share/volume name
     {
       // TODO: Maybe just call Exists() if caller does not provide stat buffer
       if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
@@ -235,7 +231,7 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
 
 // Function: xafp_open_file
 // Returns: Handle on success (> 0), error code on failure (< 0)
-xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_open_flags flags)
+xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, int flags)
 {
   if (!hnd || !pPath)
     return -1;
@@ -248,17 +244,10 @@ xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, xafp_
   if (volId)
   {
     _client_context* pCtx = (_client_context*)hnd;
-    std::string dir = path.substr(pos + 1,path.rfind('/') - pos);
-    int dirId = pCtx->session->GetDirectory(volId, dir.c_str());
-    if (dirId > 0)
-    {
-      std::string file = path.substr(path.rfind('/') + 1);
-      return pCtx->session->OpenFile(volId, dirId, file.c_str());
-    }
-    else 
-      return -2;
+    uint16_t mode = ((flags & xafp_open_flag_read) ? kFPForkRead : 0) | ((flags & xafp_open_flag_write) ? kFPForkWrite : 0); // Translate mode flags from xafp to AFP
+    return pCtx->session->OpenFile(volId, path.substr(pos).c_str(), mode); // Path does NOT include share/volume name
   }
-  return -3;
+  return -2;
 }
 
 // Function: xafp_read_file
@@ -272,6 +261,23 @@ int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int o
   return pCtx->session->ReadFile(file, offset, pBuf, len);
 }
 
+// Function: xafp_write_file
+// Returns: bytes written on success (> 0), error code on failure (< 0)
+int xafp_write_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len, bool flush /*=false*/)
+{
+  if (!hnd || !file || !pBuf || !len)
+    return 0;
+  
+  _client_context* pCtx = (_client_context*)hnd;
+  if (pCtx->session->WriteFile(file, offset, pBuf, len) == len)
+  {
+    if (flush)
+      pCtx->session->FlushFile(file);
+    return len;
+  }
+  return -1;
+}
+
 // Function: xafp_close_file
 // Returns: None
 void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file)
@@ -281,4 +287,105 @@ void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file)
   
   _client_context* pCtx = (_client_context*)hnd;
   pCtx->session->CloseFile(file);
+}
+
+// Function: xafp_create_dir
+// Returns: Zero(0) on success, error code on failure (< 0)
+int xafp_create_dir(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/)
+{
+  if (!hnd || !pPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete (implement wrapper class?)
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  int pos = path.find('/');
+  std::string volume = path.substr(0, pos);
+  int volId = xafp_find_volume_id(hnd, volume.c_str());
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    int dirId = pCtx->session->Create(volId, path.substr(pos).c_str(), true);
+    if (dirId > 0)
+      return 0; // TODO: Return dirId once error codes are normalized
+    return -3;
+  }
+  return -2;
+}
+
+// Function: xafp_create_file
+// Returns: Zero(0) on success, error code on failure (< 0)
+int xafp_create_file(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/)
+{
+  if (!hnd || !pPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete (implement wrapper class?)
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  int pos = path.find('/');
+  std::string volume = path.substr(0, pos);
+  int volId = xafp_find_volume_id(hnd, volume.c_str());
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    if (!pCtx->session->Create(volId, path.substr(pos).c_str()))
+      return 0;
+    return -3;
+  }
+  return -2;  
+}
+
+// Function: xafp_remove
+// Returns: Zero(0) on success, error code on failure (< 0)
+// TODO: Implement recursive delete of contents (rm -rf)
+int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/)
+{
+  if (!hnd || !pPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete (implement wrapper class?)
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  int pos = path.find('/');
+  std::string volume = path.substr(0, pos);
+  int volId = xafp_find_volume_id(hnd, volume.c_str());
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    if (pCtx->session->Delete(volId, path.substr(pos).c_str()) == kNoError)
+      return 0;
+    return -3;
+  }
+  return -2;
+}
+
+// Session Pool
+///////////////////////////////////////////////////////
+xafp_session_pool_handle xafp_create_session_pool(int timeout /*=300*/)
+{
+  // Allocate pool structure
+  
+  // Initialize
+  
+  return NULL;
+}
+
+xafp_client_handle xafp_get_context(xafp_session_pool_handle pool, const char* pServer, const char* pUser /*=NULL*/, const char* pPass /*=NULL*/, unsigned int port /*=548*/)
+{
+  // Look for existing session that matches parameters
+  
+  // Create a new one if none exists
+  
+  // Increment the reference count for the session
+  return NULL;
+}
+
+void xafp_free_context(xafp_session_pool_handle pool, xafp_client_handle ctx)
+{
+  // Decrement the reference count for the session
+  
+  // If the count goes to zero, start the timer
+}
+
+void xafp_destroy_session_pool(xafp_session_pool_handle pool)
+{
+  // Clean-up any remaining sessions
 }

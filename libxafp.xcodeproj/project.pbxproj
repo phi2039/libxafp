@@ -18,6 +18,16 @@
 		83A8636814269C90000B8F90 /* libxafp.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 83A8636014269B89000B8F90 /* libxafp.dylib */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		83EB88CB1432D3E100A875C2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 08FB7793FE84155DC02AAC07 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 83D4CEAE140AAF8400C157C2;
+			remoteInfo = libxafp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		8DD76F690486A84900D96B5E /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -237,6 +247,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				83EB88CC1432D3E100A875C2 /* PBXTargetDependency */,
 			);
 			name = "libxafp-test";
 			productInstallPath = "$(HOME)/bin";
@@ -293,6 +304,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		83EB88CC1432D3E100A875C2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 83D4CEAE140AAF8400C157C2 /* libxafp */;
+			targetProxy = 83EB88CB1432D3E100A875C2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1DEB923208733DC60010E9CD /* Debug */ = {

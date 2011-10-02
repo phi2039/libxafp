@@ -112,10 +112,9 @@ void CDSIBuffer::Write(const char* pVal)
   m_pIndex+=len;
 }
 
-void CDSIBuffer::WriteUTF8(const char* pVal)
+void CDSIBuffer::WritePathSpec(const char* pVal, uint16_t len /*=0*/)
 {
-  uint16_t len = 0;
-  if (pVal)
+  if (pVal && !len) // If caller did not provide length 'hint' we need to check it
     len = strlen(pVal);
 
   CONFIRM_BUF_SIZE(sizeof(len) + len + 5);
@@ -128,9 +127,27 @@ void CDSIBuffer::WriteUTF8(const char* pVal)
   m_pIndex+=sizeof(uint16_t);
   
   if (pVal)
+  {
+    // Copy the path spec into the buffer
     memcpy(m_pIndex, pVal, len);
-  
+    // AFP path specifiers use NULL-chars as separators
+    // Replace all the slashes with NULLs
+    char* p = (char*)m_pIndex;
+    for (int i = 0; i < len; i++)
+    {
+      if (p[i] == '/')
+        p[i] = '\0';
+    }
+  }
   m_pIndex+=len;
+}
+
+void CDSIBuffer::Skip(uint32_t bytes)
+{
+  if ((m_pIndex + bytes) > (m_pIndex + m_DataLen))
+    m_pIndex = m_pIndex + m_DataLen;
+  else
+    m_pIndex += bytes;
 }
 
 uint8_t CDSIBuffer::Read8()
@@ -363,7 +380,7 @@ void CDSISession::Close()
   XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: Closed session");
 }
 
-int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=NULL*/)
+int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=NULL*/, uint32_t writeOffset /*=0*/)
 {
   if (!IsOpen())
   {
@@ -379,7 +396,16 @@ int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=N
   
   // TODO: This is a messy way to get the AFP command Id...
   XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), request.id);
-  int err = SendMessage(DSICommand, request.id, &payload);
+
+  int err = kNoError;
+  if (writeOffset)
+  {
+    err = SendMessage(DSIWrite, request.id, &payload, writeOffset);
+  }
+  else
+  {
+    err = SendMessage(DSICommand, request.id, &payload);
+  }
   if (!err)
   {
     // The DSICommand message always expects a response, even if the caller does not (no return payload)

@@ -343,7 +343,8 @@ bool CAFPSession::LoginClearText(const char* pUsername, const char* pPassword)
   reqBuf.Write((uint8_t)0); // Pad
   char pwd[10];
   memset(pwd,0,8);
-  memcpy(pwd, pPassword, strlen(pPassword));
+  int len = strlen(pPassword);
+  memcpy(pwd, pPassword, len > 8 ? 8 : len);
   reqBuf.Write((void*)pwd, 8); // Password parameter is 8 bytes long
 
   uint32_t err = SendCommand(reqBuf);
@@ -399,45 +400,26 @@ void CAFPSession::CloseVolume(int volId)
   SendCommand(reqBuf);
 }
 
-// The Directory ID of the root is always 2
-// TODO: Is this thread-safe?
-int CAFPSession::GetDirectory(int volumeId, const char* pPath, int parentId /*=2*/)
-{
-  // AFP path specifiers use NULL-chars as separators
-  // Replace all the slashes with NULLs
-  int len = strlen(pPath);
-  char* pBuf = (char*)malloc(len+1);
-  memcpy(pBuf, pPath, len);
-  pBuf[len] = 0;
-  for (int i = 0; i < len; i++)
-  {
-    if (pBuf[i] == '/')
-      pBuf[i] = '\0';
-  }
-  
+int CAFPSession::GetDirectoryId(int volumeId, const char* pPathSpec, int refId /*=2*/)
+{  
+  int len = strlen(pPathSpec);
   CDSIBuffer reqBuf(13 + 4 + 1 + len + 1);
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
   reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)parentId); // Assume all references 
+  reqBuf.Write((uint32_t)refId); // Point from which to start the search
   reqBuf.Write((uint16_t)NULL); // File Bitmap
   uint16_t bitmap = kFPNodeIDBit;
   reqBuf.Write((uint16_t)bitmap); // Directory Bitmap
-  
-  reqBuf.Write((uint8_t)3); // kFPUTF8Name
-  reqBuf.Write((uint32_t)0x08000103); // 'Unknown'
-  reqBuf.Write((uint16_t)len);
-  reqBuf.Write((void*)pBuf, len);
-  free(pBuf);
+  reqBuf.WritePathSpec(pPathSpec, len);
   
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
   if (err == kNoError)
   {
-    replyBuf.Read16(); // Skip File Bitmap (we already specified)
-    replyBuf.Read16(); // Skip Directory Bitmap (we already specified)
+    replyBuf.Skip(4); // Skip File Bitmap and Directory Bitmap (we already specified)
     bool isDir = replyBuf.Read8() & 0x80; // Directory bit + pad(7bits)
-    replyBuf.Read8(); // Pad
+    replyBuf.Skip(1); // Pad
     if (isDir)
     {
       CDirParams params(bitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
@@ -447,7 +429,7 @@ int CAFPSession::GetDirectory(int volumeId, const char* pPath, int parentId /*=2
   return 0; // TODO: Need error codes for callers...  
 }
 
-int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, int dirId)
+int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, const char* pPathSpec, int refId /*=2*/)
 {
   if (!IsLoggedIn())
     return kFPUserNotAuth;
@@ -455,13 +437,15 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, int dirId)
   if (!ppList)
     return kParamError;
   
+  int len = strlen(pPathSpec);
+  
   // TODO: handle instances that require multiple calls (too many entries for one block)
   CDSIBuffer reqBuf(29); // TODO: This method of sizing the request block is WAAAY too error-prone...
   // TODO: FPEnumerateExt2 requires AFPv3.1 - need to add support for FPEnumerateExt for AFPv3.0
   reqBuf.Write((uint8_t)FPEnumerateExt2); // Command
   reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)dirId);
+  reqBuf.Write((uint32_t)refId);
   uint16_t fileBitmap = kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPExtDataForkLenBit;
   reqBuf.Write((uint16_t)fileBitmap); // File Bitmap
   uint16_t dirBitmap = kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPOffspringCountBit;
@@ -469,7 +453,7 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, int dirId)
   reqBuf.Write((uint16_t)20); // Max Results
   reqBuf.Write((uint32_t)1); // Start Index
   reqBuf.Write((uint32_t)5280); // Max Reply Size
-  reqBuf.WriteUTF8(NULL);
+  reqBuf.WritePathSpec(pPathSpec, len);
 
   CDSIBuffer* pReplyBuf = new CDSIBuffer();
   uint32_t err = SendCommand(reqBuf, pReplyBuf);
@@ -489,23 +473,17 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, int dirId)
   }
 }
 
-int CAFPSession::Stat(int volumeId, const char* pPath, CNodeParams** pParams)
+int CAFPSession::Stat(int volumeId, const char* pPathSpec, CNodeParams** pParams, int refId /*=2*/)
 {
   if (!IsLoggedIn())
     return kFPUserNotAuth;
-  
-  std::string path(pPath);
-  int pos = path.rfind('/');
-  
-  int dirId = GetDirectory(volumeId, path.substr(0, pos).c_str());
-  
-  std::string fileName = path.substr(pos+1);
-  
-  CDSIBuffer reqBuf(13 + 4 + 1 + fileName.length());
+
+  int len = strlen(pPathSpec);
+  CDSIBuffer reqBuf(13 + 4 + 1 + len);
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
   reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)dirId);
+  reqBuf.Write((uint32_t)refId);
   
   uint16_t fileBitmap = NULL;
   uint16_t dirBitmap = NULL;
@@ -516,7 +494,7 @@ int CAFPSession::Stat(int volumeId, const char* pPath, CNodeParams** pParams)
   }
   reqBuf.Write((uint16_t)fileBitmap);
   reqBuf.Write((uint16_t)dirBitmap);
-  reqBuf.WriteUTF8(fileName.c_str());
+  reqBuf.WritePathSpec(pPathSpec, len);
     
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
@@ -545,46 +523,46 @@ int CAFPSession::Stat(int volumeId, const char* pPath, CNodeParams** pParams)
   return -1;
 }
 
-int CAFPSession::OpenFile(int volumeId, int dirId, const char* pName)
+int CAFPSession::OpenFile(int volumeId, const char* pPathSpec, uint16_t mode /*=kFPForkRead*/, int refId /*=2*/)
 {
   if (!IsLoggedIn())
-    return 0;
+    return -1;
 
-  uint16_t nameLen = strlen(pName);
-  CDSIBuffer reqBuf(17 + nameLen + 1);
+  uint16_t len = strlen(pPathSpec);
+  CDSIBuffer reqBuf(17 + len + 1);
   
   reqBuf.Write((uint8_t)FPOpenFork); // Command
   reqBuf.Write((uint8_t)0); // Flag (File Fork)
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)dirId);
+  reqBuf.Write((uint32_t)refId);
   reqBuf.Write((uint16_t)0); // No need to return any parameters
-  reqBuf.Write((uint16_t)kFPForkRead); // Open read-only
-  reqBuf.WriteUTF8(pName);
+  reqBuf.Write((uint16_t)mode);
+  reqBuf.WritePathSpec(pPathSpec, len);
   
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
   if (err == kNoError)
   {
-    replyBuf.Read16(); // Skip bitmap. We didn't request any params
+    replyBuf.Skip(2); // Skip bitmap. We didn't request any params
     uint16_t forkId = replyBuf.Read16();
     return forkId;
   } 
   return 0;
 }
 
-int CAFPSession::Create(int volumeId, int parentId, const char* pName, bool dir /*=false*/)
+int CAFPSession::Create(int volumeId, const char* pPathSpec, bool dir /*=false*/, int refId /*=2*/)
 {
   if (!IsLoggedIn())
-    return 0;
+    return -1;
   
-  uint16_t nameLen = strlen(pName);
-  CDSIBuffer reqBuf(15 + nameLen + 1);
+  uint16_t len = strlen(pPathSpec);
+  CDSIBuffer reqBuf(15 + len + 1);
   
   reqBuf.Write((uint8_t)(dir ? FPCreateDir : FPCreateFile)); // Command
   reqBuf.Write((uint8_t)(dir ? 0 : 1)); // Pad/Flag
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)parentId);
-  reqBuf.WriteUTF8(pName);
+  reqBuf.Write((uint32_t)refId);
+  reqBuf.WritePathSpec(pPathSpec, len);
   
   CDSIBuffer replyBuf;
   int32_t err = SendCommand(reqBuf, dir ? &replyBuf : NULL);
@@ -598,19 +576,19 @@ int CAFPSession::Create(int volumeId, int parentId, const char* pName, bool dir 
   return err;
 }
 
-int CAFPSession::Delete(int volumeId, int parentId, const char* pName)
+int CAFPSession::Delete(int volumeId, const char* pPathSpec, int refId /*=2*/)
 {
   if (!IsLoggedIn())
-    return 0;
+    return -1;
   
-  uint16_t nameLen = strlen(pName);
-  CDSIBuffer reqBuf(15 + nameLen + 1);
+  uint16_t len = strlen(pPathSpec);
+  CDSIBuffer reqBuf(15 + len + 1);
   
   reqBuf.Write((uint8_t)FPDelete); // Command
   reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((uint16_t)volumeId);
-  reqBuf.Write((uint32_t)parentId);
-  reqBuf.WriteUTF8(pName); // kFPUTF8Name
+  reqBuf.Write((uint32_t)refId);
+  reqBuf.WritePathSpec(pPathSpec, len);
   
   int32_t err = SendCommand(reqBuf);
   return err;
@@ -618,6 +596,9 @@ int CAFPSession::Delete(int volumeId, int parentId, const char* pName)
 
 void CAFPSession::CloseFile(int forkId)
 {
+  if (!IsLoggedIn())
+    return;
+  
   CDSIBuffer reqBuf(4);
   reqBuf.Write((uint8_t)FPCloseFork); // Command
   reqBuf.Write((uint8_t)0); // Flag (File Fork)
@@ -628,6 +609,9 @@ void CAFPSession::CloseFile(int forkId)
 
 int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
 {
+  if (!IsLoggedIn())
+    return -1;
+  
   CDSIBuffer reqBuf(20);
   reqBuf.Write((uint8_t)FPReadExt); // Command
   reqBuf.Write((uint8_t)0); // Pad
@@ -647,18 +631,46 @@ int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
   return 0;
 }
 
-//int CAFPSession::WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
-//{
-//  CDSIBuffer reqBuf(20);
-//  reqBuf.Write((uint8_t)FPWriteExt); // Command
-//  reqBuf.Write((uint8_t)0); // Flag (Offset from start of file)
-//  reqBuf.Write((uint16_t)forkId);
-//  reqBuf.Write((uint64_t)offset); // Offset
-//  reqBuf.Write((uint64_t)len); // Bytes to Write
-//  
-//  
-//  
-//}
+int CAFPSession::WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
+{
+  // TODO: Handle requests in chunks the size of the server quantum (provided in OpenSession)
+  
+  if (!IsLoggedIn())
+    return -1;
+  
+  CDSIBuffer reqBuf(20 + len);
+  reqBuf.Write((uint8_t)FPWriteExt); // Command
+  reqBuf.Write((uint8_t)0); // Flag (Offset from start of file)
+  reqBuf.Write((uint16_t)forkId);
+  reqBuf.Write((uint64_t)offset); // Offset
+  reqBuf.Write((uint64_t)len); // Bytes to Write
+  reqBuf.Write((void*)pBuf, len); // TODO: This is a useless copy...come up with a better way
+
+  // TODO: Lock the range to be written before beginning the write
+  CDSIBuffer replyBuf;
+  uint32_t err = SendCommand(reqBuf, &replyBuf, 20);
+  if (err == kNoError)
+    return len;
+
+  return 0;
+}
+
+int CAFPSession::FlushFile(int forkId)
+{
+  if (!IsLoggedIn())
+    return -1;
+  
+  CDSIBuffer reqBuf(4);
+  reqBuf.Write((uint8_t)FPFlushFork); // Command
+  reqBuf.Write((uint8_t)0); // Pad
+  reqBuf.Write((uint16_t)forkId);
+
+  uint32_t err = SendCommand(reqBuf);
+  if (err == kNoError)
+    return 0;
+  return -2;
+}
+
 
 /*
  // http://developer.apple.com/library/mac/#documentation/Networking/Conceptual/AFP/AFPSecurity/AFPSecurity.html

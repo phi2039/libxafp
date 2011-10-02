@@ -83,8 +83,10 @@ public:
   void Write(uint32_t val);
   void Write(uint64_t val);
   void Write(const char* pVal);
-  void WriteUTF8(const char* pVal);
+  void WritePathSpec(const char* pVal, uint16_t len = 0);
   
+  void Skip(uint32_t bytes);
+
   uint8_t Read8();
   uint16_t Read16();
   uint32_t Read32();
@@ -129,7 +131,7 @@ public:
 
   uint16_t GetNewRequestId(){return m_LastRequestId++;}
   
-  int32_t SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse = NULL);
+  int32_t SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse = NULL, uint32_t writeOffset = 0);
 
   // ITCPReceiveCallback Implementation
   void OnReceive(CTCPPacketReader& reader); 
