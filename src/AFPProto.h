@@ -75,7 +75,7 @@ enum
   FPLogout = 20,
   //  FPMapID
   //  FPMapName
-  //  FPMoveAndRename
+  FPMoveAndRename = 23,
   //  FPOpenDir // Deprecated
   //  FPOpenDT
   FPOpenFork = 26,

@@ -109,6 +109,7 @@ public:
 
   int Create(int volumeId, const char* pPathSpec, bool dir = false, int refId = 2);
   int Delete(int volumeId, const char* pPathSpec, int refId = 2);
+  int Move(int volumeId, const char* pPathSpec, const char* pNewPathSpec);
              
   int Stat(int volumeId, const char* pPathSpec, CNodeParams** ppParams, int refId = 2);
   int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}

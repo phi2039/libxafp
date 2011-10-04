@@ -238,7 +238,34 @@ void cat(const char* path, void* pBuf, int len, const char* username, const char
   xafp_destroy_context(ctx);  
 }
 
-
+void mv(const char* path, const char* newPath, const char* username, const char* pass, uint32_t offset=0)
+{
+  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  
+  // Authenticate and open the desired volume
+  char volume[128];
+  if (path[0] == '/')
+    path++; //offset start by one to account for leading '/'
+  
+  char* pVol = strstr(path, "/"); // Find volume name separator
+  if (pVol)
+  {
+    int pos = pVol - path;
+    strncpy(volume, path, pos);
+    volume[pos] = 0;
+  }
+  else
+    return;
+  
+  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
+  {
+    xafp_rename_file(ctx, path, newPath);
+    xafp_unmount(ctx, volume);
+  }
+  
+  // Clean-up the session
+  xafp_destroy_context(ctx);  
+}
 int main (int argc, char * const argv[]) 
 {
   xafp_set_log_level(XAFP_LOG_LEVEL_INFO | XAFP_LOG_FLAG_DSI_PROTO);
@@ -256,6 +283,9 @@ int main (int argc, char * const argv[])
   char msg[] = "Hello World!\n";
   cat("/Media/video/Test/bar.txt",msg, strlen(msg), "chris",secret);
   
+  mv("/Media/video/Test/bar.txt", "/Media/video/Test/bar2.txt", "chris",secret);
+
+  rm("/Media/video/Test/bar2.txt","chris",secret);
 //  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
   
   return 0;

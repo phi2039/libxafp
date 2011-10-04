@@ -190,6 +190,7 @@ void xafp_free_iter(xafp_node_iterator iter)
 
 // File I/O
 //////////////////////////////////////
+// TODO: Address structure size differences for 'stat' structure
 int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
 {
   if (!hnd || !pPath)
@@ -206,9 +207,9 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
     CNodeParams* pParams = NULL;
     if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams)) // Path does NOT include share/volume name
     {
-      // TODO: Maybe just call Exists() if caller does not provide stat buffer
       if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
       {
+        memset(pStat, 0, sizeof(*pStat));
         xafp_node_info* pInfo = pParams->GetInfo();
         pStat->st_dev = volId; // Substitute volume for device
         pStat->st_ino = pInfo->nodeId;
@@ -224,6 +225,7 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
       }
       return 0;
     }
+    delete pParams;
     return -3;
   }
   return -2;
@@ -355,6 +357,30 @@ int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/
     return -3;
   }
   return -2;
+}
+
+int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNewPath)
+{
+  if (!hnd || !pPath|| !pNewPath)
+    return -1;
+  
+  // TODO: Make this more reliable and complete (implement wrapper class?)
+  std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  std::string newPath = (pNewPath[0] == '/') ? pNewPath + 1 : pNewPath; // Strip the leading '/' if there is one
+  
+  int pos = path.find('/');
+  int newPos = newPath.find('/');
+
+  std::string volume = path.substr(0, pos);
+  if (volume != newPath.substr(0, newPos))
+    return -2; // Paths are on different volumes
+  
+  int volId = xafp_find_volume_id(hnd, volume.c_str()); // Make sure we are mounted
+  if (volId)
+  {
+    _client_context* pCtx = (_client_context*)hnd;
+    return pCtx->session->Move(volId, path.substr(pos).c_str(), newPath.substr(newPos).c_str());
+  }
 }
 
 // Session Pool

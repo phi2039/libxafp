@@ -594,6 +594,40 @@ int CAFPSession::Delete(int volumeId, const char* pPathSpec, int refId /*=2*/)
   return err;
 }
 
+int CAFPSession::Move(int volumeId, const char* pPathSpec, const char* pNewPathSpec)
+{
+  if (!IsLoggedIn())
+    return -1;
+  
+  std::string src = pPathSpec;
+  std::string dest = pNewPathSpec;
+
+  // Make sure the source exists, and get some information about it
+  CNodeParams* pParams = NULL;
+  if (Stat(volumeId, pPathSpec, &pParams) < 0)
+    return -2;
+  
+  int newPos = dest.rfind('/');
+    
+  // TODO: Add more robust error checking/string validation...
+  CDSIBuffer reqBuf(22 + src.length() + dest.length() + 2);
+  reqBuf.Write((uint8_t)FPMoveAndRename); // Command
+  reqBuf.Write((uint8_t)0); // Pad
+  reqBuf.Write((uint16_t)volumeId);
+  reqBuf.Write((uint32_t)2); // Source Directory Id (root)
+  reqBuf.Write((uint32_t)2); // Dest Directory Id (root)
+  reqBuf.WritePathSpec(pPathSpec, src.length());
+  reqBuf.WritePathSpec(dest.substr(0, newPos).c_str(), newPos); // Trim filename from path
+  reqBuf.WritePathSpec(dest.substr(newPos + 1).c_str(), dest.length() - newPos - 1); // Just the destination filename
+  
+  CDSIBuffer replyBuf;
+  uint32_t err = SendCommand(reqBuf, &replyBuf);
+  if (err == kNoError)
+    return 0;
+    
+  return -3;
+}
+
 void CAFPSession::CloseFile(int forkId)
 {
   if (!IsLoggedIn())

@@ -157,6 +157,7 @@ void xafp_close_file(xafp_client_handle hnd, xafp_file_handle file);
 // Path spec includes share/volume name
 int xafp_create_dir(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
 int xafp_create_file(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
+int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNewPath);
 
 int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
 
