@@ -381,37 +381,53 @@ int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNew
     _client_context* pCtx = (_client_context*)hnd;
     return pCtx->session->Move(volId, path.substr(pos).c_str(), newPath.substr(newPos).c_str());
   }
+  return 0;
 }
 
-// Session Pool
+// Context/Session Pool
 ///////////////////////////////////////////////////////
-xafp_session_pool_handle xafp_create_session_pool(int timeout /*=300*/)
+xafp_context_pool_handle xafp_create_context_pool(int timeout /*=300*/)
 {
-  // Allocate pool structure
+  _context_pool* pPool = (_context_pool*)malloc(sizeof(_context_pool));
+  pPool->manager = new CSessionManager();
   
-  // Initialize
+  return pPool;
+}
+
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, unsigned int port /*=548*/, const char* pUser /*=NULL*/, const char* pPass /*=NULL*/)
+{
+  if (hnd)
+  {
+    _context_pool* pPool = (_context_pool*)hnd;
+    if (pPool->manager)
+      return pPool->manager->GetContext(pServer, port, pUser, pPass);
+  }
   
   return NULL;
 }
 
-xafp_client_handle xafp_get_context(xafp_session_pool_handle pool, const char* pServer, const char* pUser /*=NULL*/, const char* pPass /*=NULL*/, unsigned int port /*=548*/)
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, const char* pUser /*=NULL*/, const char* pPass /*=NULL*/)
 {
-  // Look for existing session that matches parameters
-  
-  // Create a new one if none exists
-  
-  // Increment the reference count for the session
-  return NULL;
+  return xafp_get_context(hnd, pServer, 548, pUser, pPass);
 }
 
-void xafp_free_context(xafp_session_pool_handle pool, xafp_client_handle ctx)
+void xafp_free_context(xafp_context_pool_handle hnd, xafp_client_handle ctx)
 {
-  // Decrement the reference count for the session
-  
-  // If the count goes to zero, start the timer
+  if (hnd)
+  {
+    _context_pool* pPool = (_context_pool*)hnd;
+    if (pPool->manager)
+      pPool->manager->FreeContext((_client_context*)ctx);
+  }
 }
 
-void xafp_destroy_session_pool(xafp_session_pool_handle pool)
+void xafp_destroy_context_pool(xafp_context_pool_handle hnd)
 {
-  // Clean-up any remaining sessions
+  if (!hnd)
+    return;
+  
+  _context_pool* pPool = (_context_pool*)hnd;
+  delete pPool->manager;
+  
+  free(pPool);
 }

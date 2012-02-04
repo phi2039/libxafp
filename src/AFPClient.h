@@ -22,67 +22,31 @@
 
 #include "DSIClient.h"
 
+#include "AFPNode.h"
+
 /////////////////////////////////////////////////////////////////////////////////
 // AFP Protocol Layer
 /////////////////////////////////////////////////////////////////////////////////
-class CNodeParams
+
+class CAFPUserAuthInfo
 {
 public:
-  CNodeParams();
-  virtual ~CNodeParams();
-  int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-  xafp_node_info* GetInfo() {return &m_Info;}
-protected:
-  xafp_node_info m_Info;
+  virtual const char* GetUserName() = 0;  
 };
 
-// AFP File and Directory Parameter Handling
-/////////////////////////////////////////////////////////////////////////////////
-class CDirParams : public CNodeParams
+class CAFPCleartextAuthInfo : public CAFPUserAuthInfo
 {
 public:
-  CDirParams() : CNodeParams() {m_Info.isDirectory = true;}
-  CDirParams(uint32_t bitmap, uint8_t* pData, uint32_t size);
-  int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-};
-
-class CFileParams : public CNodeParams
-{
-public:
-  CFileParams() : CNodeParams() {m_Info.isDirectory = false;}
-  CFileParams(uint32_t bitmap, uint8_t* pData, uint32_t size);
-  int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
-};
-
-class CAFPNodeList
-{
-public:
-  CAFPNodeList(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap, int count);
-  virtual ~CAFPNodeList();
-  int GetSize(){return m_Count;}
-  
-  class Iterator
+  CAFPCleartextAuthInfo(const char* username, const char* password)
   {
-  public:
-    Iterator(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap);
-    CNodeParams* MoveNext();
-    CNodeParams* GetCurrent() {return m_pCurrent;}
-  protected:
-    uint8_t* m_pData;
-    uint8_t* m_pEnd;
-    CDirParams m_DirParams;
-    uint32_t m_DirBitmap;
-    CFileParams m_FileParams;
-    uint32_t m_FileBitmap;
-    CNodeParams* m_pCurrent;
-  };
-  Iterator* GetIterator() {return &m_Iter;}
+    strncpy(m_UserName, username, 255);
+    strncpy(m_Password, password, 8);
+  }
+  const char* GetUserName() {return m_UserName;}
+  const char* GetPassword() {return m_Password;}
 protected:
-  CDSIBuffer* m_pBuffer;
-  int m_Count;
-  uint32_t m_DirBitmap;
-  uint32_t m_FileBitmap;
-  Iterator m_Iter;
+  char m_UserName[256]; // 255 char max + NULL
+  char m_Password[9]; // 8 char max + NULL
 };
 
 // AFP Session Handling
@@ -115,7 +79,9 @@ public:
   int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
-  bool LoginClearText(const char* pUsername, const char* pPassword);
+  bool LoginClearText(CAFPCleartextAuthInfo* authInfo);
   
   bool m_LoggedIn;
+  CAFPUserAuthInfo* m_pAuthInfo;
+  
 };

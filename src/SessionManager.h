@@ -20,39 +20,38 @@
  *
  */
 
-#include <pthread.h>
-
-// Simple Thread Synchronization Event Wrapper
-//////////////////////////////////////////////
-class CThreadSyncEvent
+struct context_record
 {
-public:
-  CThreadSyncEvent();
-  virtual ~CThreadSyncEvent();
-  int Wait(int timeout = -1);
-  void Set();
-  void Reset();
-protected:
-  pthread_mutex_t m_Mutex;
-  pthread_cond_t m_Cond;
-  bool m_Signaled;
+  _client_context* ctx;
+  bool isIdle;
+  time_t idleTime;
+  time_t lastCheck;
 };
 
-// Simple Mutex Wrapper
-//////////////////////////////////////////////
-class CMutexLock
+typedef std::string context_id;
+typedef std::multimap<context_id,context_record> context_map;
+
+class CSessionManager
 {
 public:
-  inline CMutexLock(pthread_mutex_t m) :
-    m_Mutex(m)
-  {
-    pthread_mutex_lock(&m_Mutex);
-  }
-  inline ~CMutexLock()
-  {
-    pthread_mutex_unlock(&m_Mutex);  
-  }
+  CSessionManager(int sessionTimeout=300);
+  virtual ~CSessionManager();
+  
+  // Find an idle client context or create a new one
+  _client_context* GetContext(const char* pHost, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
+  void FreeContext(_client_context* pCtx);
+  
 protected:
-  pthread_mutex_t m_Mutex;
+  int m_SessionTimeout;
+  context_map m_Contexts;
+  pthread_mutex_t m_MapMutex;
+  
+  int MonitorThreadProc();
+  bool StartMonitorThread();
+  void StopMonitorThread();
+  static void* MonitorThreadStub(void* p);
+  pthread_t m_MonitorThread;
+  bool m_MonitorThreadQuitFlag;
+  
+  
 };
-

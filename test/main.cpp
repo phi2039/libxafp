@@ -2,9 +2,26 @@
 #include <iostream>
 #include "../include/libxafp.h"
 
+xafp_context_pool_handle pool = NULL;
+
+xafp_client_handle get_context(const char* host, const char* username, const char* pass)
+{
+  if (pool)
+    return xafp_get_context(pool, host, username, pass);
+  return xafp_create_context("kennel", username, pass);
+}
+
+void free_context(xafp_client_handle ctx)
+{
+  if (pool)
+    xafp_free_context(pool, ctx);
+  else
+    xafp_destroy_context(ctx);  
+}
+
 void cp(const char* path, const char* dest, const char* username, const char* pass)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -56,12 +73,12 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);
+  free_context(ctx);
 }
 
 void ls(const char* path, const char* username, const char* pass)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -117,12 +134,12 @@ void ls(const char* path, const char* username, const char* pass)
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);
+  free_context(ctx);
 }
 
 void mkdir(const char* path, const char* username, const char* pass)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -146,12 +163,12 @@ void mkdir(const char* path, const char* username, const char* pass)
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);  
+  free_context(ctx);  
 }
 
 void rm(const char* path, const char* username, const char* pass)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -175,12 +192,12 @@ void rm(const char* path, const char* username, const char* pass)
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);  
+  free_context(ctx);  
 }
 
 void touch(const char* path, const char* username, const char* pass)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -202,11 +219,12 @@ void touch(const char* path, const char* username, const char* pass)
     xafp_create_file(ctx, path);
     xafp_unmount(ctx, volume);
   }
+  free_context(ctx);  
 }
 
 void cat(const char* path, void* pBuf, int len, const char* username, const char* pass, uint32_t offset=0)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -235,12 +253,12 @@ void cat(const char* path, void* pBuf, int len, const char* username, const char
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);  
+  free_context(ctx);  
 }
 
 void mv(const char* path, const char* newPath, const char* username, const char* pass, uint32_t offset=0)
 {
-  xafp_client_handle ctx = xafp_create_context("kennel", username, pass);
+  xafp_client_handle ctx = get_context("kennel", username, pass);
   
   // Authenticate and open the desired volume
   char volume[128];
@@ -264,15 +282,19 @@ void mv(const char* path, const char* newPath, const char* username, const char*
   }
   
   // Clean-up the session
-  xafp_destroy_context(ctx);  
+  free_context(ctx);  
 }
+
+
 int main (int argc, char * const argv[]) 
 {
-  xafp_set_log_level(XAFP_LOG_LEVEL_INFO | XAFP_LOG_FLAG_DSI_PROTO);
+  xafp_set_log_level(XAFP_LOG_LEVEL_INFO | XAFP_LOG_FLAG_DSI_PROTO | XAFP_LOG_FLAG_SESS_MGR);
   char secret[32];
   FILE* fsecret = fopen(argv[1], "r");
   fread(secret, 1, sizeof(secret), fsecret);
 
+  pool = xafp_create_context_pool();
+  
   ls("/Media/video/Movies/BRRip","chris",secret);
   
   mkdir("/Media/video/Test/foo","chris",secret);  
@@ -287,6 +309,10 @@ int main (int argc, char * const argv[])
 
   rm("/Media/video/Test/bar2.txt","chris",secret);
 //  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
+
+  sleep(10);
+  
+  xafp_destroy_context_pool(pool);
   
   return 0;
 }

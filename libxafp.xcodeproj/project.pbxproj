@@ -16,6 +16,10 @@
 		83A8635C14269ADA000B8F90 /* TCPClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83D4CEA0140AAE6000C157C2 /* TCPClient.cpp */; };
 		83A8635D14269AE1000B8F90 /* Threads.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83A861B014265502000B8F90 /* Threads.cpp */; };
 		83A8636814269C90000B8F90 /* libxafp.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 83A8636014269B89000B8F90 /* libxafp.dylib */; };
+		83FDFCC814DD77FD00863CA3 /* AFPNode.h in Headers */ = {isa = PBXBuildFile; fileRef = 83FDFCC614DD77FD00863CA3 /* AFPNode.h */; };
+		83FDFCC914DD77FD00863CA3 /* AFPNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83FDFCC714DD77FD00863CA3 /* AFPNode.cpp */; };
+		83FDFD0A14DD883300863CA3 /* SessionManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 83FDFD0814DD883300863CA3 /* SessionManager.h */; };
+		83FDFD0B14DD883300863CA3 /* SessionManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 83FDFD0914DD883300863CA3 /* SessionManager.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +64,10 @@
 		83D4CEA6140AAEB800C157C2 /* libxafp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = libxafp.cpp; path = src/libxafp.cpp; sourceTree = "<group>"; };
 		83D4CEA8140AAEC200C157C2 /* libxafp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libxafp.h; sourceTree = "<group>"; };
 		83D4D47B1415596A00C157C2 /* Utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Utils.cpp; path = src/Utils.cpp; sourceTree = "<group>"; };
+		83FDFCC614DD77FD00863CA3 /* AFPNode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AFPNode.h; path = src/AFPNode.h; sourceTree = "<group>"; };
+		83FDFCC714DD77FD00863CA3 /* AFPNode.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AFPNode.cpp; path = src/AFPNode.cpp; sourceTree = "<group>"; };
+		83FDFD0814DD883300863CA3 /* SessionManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SessionManager.h; path = src/SessionManager.h; sourceTree = "<group>"; };
+		83FDFD0914DD883300863CA3 /* SessionManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SessionManager.cpp; path = src/SessionManager.cpp; sourceTree = "<group>"; };
 		8DD76F6C0486A84900D96B5E /* xafp-test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "xafp-test"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -132,6 +140,7 @@
 		83D4CE8D140AAD0B00C157C2 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				83FDFD0714DD881100863CA3 /* Manager */,
 				83A861A1142652FB000B8F90 /* Interface */,
 				83D4D47A1415594300C157C2 /* Common */,
 				83D4CEC1140AAFFB00C157C2 /* AFP */,
@@ -184,6 +193,8 @@
 				83D4CE9C140AAE6000C157C2 /* AFPClient.cpp */,
 				83D4CE9D140AAE6000C157C2 /* AFPClient.h */,
 				83A85AE1141BCC00000B8F90 /* AFPProto.h */,
+				83FDFCC614DD77FD00863CA3 /* AFPNode.h */,
+				83FDFCC714DD77FD00863CA3 /* AFPNode.cpp */,
 			);
 			name = AFP;
 			sourceTree = "<group>";
@@ -197,6 +208,15 @@
 				83D4D47B1415596A00C157C2 /* Utils.cpp */,
 			);
 			name = Common;
+			sourceTree = "<group>";
+		};
+		83FDFD0714DD881100863CA3 /* Manager */ = {
+			isa = PBXGroup;
+			children = (
+				83FDFD0814DD883300863CA3 /* SessionManager.h */,
+				83FDFD0914DD883300863CA3 /* SessionManager.cpp */,
+			);
+			name = Manager;
 			sourceTree = "<group>";
 		};
 		C6859E8C029090F304C91782 /* Documentation */ = {
@@ -213,6 +233,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				83FDFCC814DD77FD00863CA3 /* AFPNode.h in Headers */,
+				83FDFD0A14DD883300863CA3 /* SessionManager.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,6 +314,8 @@
 				83A8635B14269AD0000B8F90 /* DSIClient.cpp in Sources */,
 				83A8635C14269ADA000B8F90 /* TCPClient.cpp in Sources */,
 				83A8635D14269AE1000B8F90 /* Threads.cpp in Sources */,
+				83FDFCC914DD77FD00863CA3 /* AFPNode.cpp in Sources */,
+				83FDFD0B14DD883300863CA3 /* SessionManager.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

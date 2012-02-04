@@ -24,6 +24,7 @@
 
 #include "AFPProto.h"
 #include "AFPClient.h"
+#include "SessionManager.h"
 
 #define MAX_SERVER_NAME 32
 #define MAX_SERVER_TYPE 32
@@ -43,6 +44,11 @@ struct _client_context
 
   CAFPSession* session;
   volume_map* volumes; 
+};
+
+struct _context_pool
+{
+  CSessionManager* manager;
 };
 
 struct _fs_node_iterator

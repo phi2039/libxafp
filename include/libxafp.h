@@ -27,7 +27,7 @@
 typedef struct _client_context* xafp_client_handle;
 typedef struct _fs_node_iterator* xafp_node_iterator;
 typedef int xafp_file_handle;
-typedef struct _session_pool* xafp_session_pool_handle;
+typedef struct _context_pool* xafp_context_pool_handle;
 
 // TODO: define common error codes
 
@@ -42,6 +42,7 @@ enum
   XAFP_LOG_FLAG_TCP_PROTO = 0x1 << 4,
   XAFP_LOG_FLAG_DSI_PROTO = 0x1 << 5,
   XAFP_LOG_FLAG_AFP_PROTO = 0x1 << 6,
+  XAFP_LOG_FLAG_SESS_MGR  = 0x1 << 7,
 };
 
 enum
@@ -141,6 +142,8 @@ void xafp_destroy_context(xafp_client_handle pCtx);
 int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags);
 void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName);
 
+// Directory Navigation/Listing
+///////////////////////////////////////////////////////
 // Path spec includes share/volume name
 xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath);
 xafp_node_info* xafp_next(xafp_node_iterator iter);
@@ -149,6 +152,8 @@ void xafp_free_iter(xafp_node_iterator iter);
 // Path spec includes share/volume name
 int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat);
 
+// File Management
+///////////////////////////////////////////////////////
 xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, int flags);
 int xafp_read_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len);
 int xafp_write_file(xafp_client_handle hnd, xafp_file_handle file, unsigned int offset, void* pBuf, unsigned int len, bool flush = false);
@@ -163,7 +168,8 @@ int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
 
 // Session Pool Definition
 ///////////////////////////////////////////////////////
-xafp_session_pool_handle xafp_create_session_pool(int timeout = 300);
-xafp_client_handle xafp_get_context(xafp_session_pool_handle pool, const char* pServer, const char* pUser=NULL, const char* pPass=NULL, unsigned int port=548);
-void xafp_free_context(xafp_session_pool_handle pool, xafp_client_handle ctx);
-void xafp_destroy_session_pool(xafp_session_pool_handle pool);
+xafp_context_pool_handle xafp_create_context_pool(int timeout = 300);
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, const char* pUser=NULL, const char* pPass=NULL);
+void xafp_free_context(xafp_context_pool_handle hnd, xafp_client_handle ctx);
+void xafp_destroy_context_pool(xafp_context_pool_handle hnd);

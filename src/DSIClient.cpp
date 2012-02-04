@@ -495,7 +495,7 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
         case DSITickle: // Used by server for 'heartbeat' monitoring
           // TODO: Track time since last notice to detect timeouts
           XAFP_LOG_0(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Received Server 'Tickle'. Sending reply...");
-          SendMessage(DSITickle, GetNewRequestId());
+          SendMessage(DSITickle, GetNewRequestId()); // Send keep-alive reply to server
           break;
         case DSIAttention: // Used by server to notify clients of events
           uint16_t attData;
