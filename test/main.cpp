@@ -38,8 +38,6 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
   else
     return;
 
-  if (!xafp_mount(ctx, "Media", xafp_mount_flag_none))
-  {
     xafp_file_handle fileHandle = xafp_open_file(ctx, path, xafp_open_flag_read);
     if (fileHandle)
     {
@@ -69,8 +67,6 @@ void cp(const char* path, const char* dest, const char* username, const char* pa
       fclose(fp);
       xafp_close_file(ctx, fileHandle);
     }
-    xafp_unmount(ctx, "Media");
-  }
   
   // Clean-up the session
   free_context(ctx);
@@ -95,8 +91,6 @@ void ls(const char* path, const char* username, const char* pass)
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
     xafp_node_iterator iter = xafp_get_dir_iter(ctx, path);
     xafp_node_info* pNode = xafp_next(iter);
     while(pNode)
@@ -130,8 +124,6 @@ void ls(const char* path, const char* username, const char* pass)
       pNode = xafp_next(iter);
     }
     xafp_free_iter(iter);
-    xafp_unmount(ctx, volume);
-  }
   
   // Clean-up the session
   free_context(ctx);
@@ -156,11 +148,7 @@ void mkdir(const char* path, const char* username, const char* pass)
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
     xafp_create_dir(ctx, path);
-    xafp_unmount(ctx, volume);
-  }
   
   // Clean-up the session
   free_context(ctx);  
@@ -185,11 +173,7 @@ void rm(const char* path, const char* username, const char* pass)
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
-    xafp_remove(ctx, path);
-    xafp_unmount(ctx, volume);
-  }
+  xafp_remove(ctx, path);
   
   // Clean-up the session
   free_context(ctx);  
@@ -214,11 +198,7 @@ void touch(const char* path, const char* username, const char* pass)
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
-    xafp_create_file(ctx, path);
-    xafp_unmount(ctx, volume);
-  }
+  xafp_create_file(ctx, path);
   free_context(ctx);  
 }
 
@@ -241,16 +221,12 @@ void cat(const char* path, void* pBuf, int len, const char* username, const char
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
     xafp_file_handle file = xafp_open_file(ctx, path, xafp_open_flag_read | xafp_open_flag_write);
     if (file)
     {
       xafp_write_file(ctx, file, offset, pBuf, len);
       xafp_close_file(ctx, file);
     }
-    xafp_unmount(ctx, volume);
-  }
   
   // Clean-up the session
   free_context(ctx);  
@@ -275,11 +251,7 @@ void mv(const char* path, const char* newPath, const char* username, const char*
   else
     return;
   
-  if (!xafp_mount(ctx, volume, xafp_mount_flag_none))
-  {
     xafp_rename_file(ctx, path, newPath);
-    xafp_unmount(ctx, volume);
-  }
   
   // Clean-up the session
   free_context(ctx);  
@@ -310,7 +282,7 @@ int main (int argc, char * const argv[])
   rm("/Media/video/Test/bar2.txt","chris",secret);
 //  cp("/Media/video/Movies/BRRip/Aeon Flux.mp4","/Users/chris/test.mp4","chris",secret);
 
-  sleep(10);
+//  sleep(30);
   
   xafp_destroy_context_pool(pool);
   

@@ -139,7 +139,7 @@ xafp_client_handle xafp_create_context(const char* pServer, unsigned int port=54
 xafp_client_handle xafp_create_context(const char* pServer, const char* pUser, const char* pPass);
 void xafp_destroy_context(xafp_client_handle pCtx);
 
-int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags);
+int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags=xafp_mount_flag_none);
 void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName);
 
 // Directory Navigation/Listing

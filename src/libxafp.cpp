@@ -21,6 +21,7 @@
 
 #include "Common.h"
 
+// NOTE: Volumes are treated as directories, so they are mounted automatically as neccessary
 
 // Context Handling
 //////////////////////////////////////
@@ -88,7 +89,7 @@ void xafp_destroy_context(xafp_client_handle hnd)
 
 // Volume Mount/Unmount
 //////////////////////////////////////
-int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags)
+int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags/*=xafp_mount_flag_none*/)
 {
   if (!hnd)
     return -4;
@@ -96,8 +97,13 @@ int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags
   if (!pVolumeName)
     return -5;
 
+  // TODO: Allow for re-mounting with different flags (r/w)
+  int res = xafp_find_volume_id(hnd, pVolumeName);
+  if (res > 0)
+    return res; // Already mounted. No need to re-mount.
+    
   _client_context* pCtx = (_client_context*)hnd;
-  
+    
   // This interface is late-binding, so the first mount request triggers connect/login
   if (!pCtx->session->IsLoggedIn())
   {
@@ -110,13 +116,13 @@ int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags
       return -2;
   }
   
-  int res = pCtx->session->OpenVolume(pVolumeName);
+  res = pCtx->session->OpenVolume(pVolumeName);
   if (res < 0)
     return -3;
   
   pCtx->volumes->insert(volume_map_entry(pVolumeName, res));
   
-  return 0;
+  return res;
 }
 
 void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName)
@@ -125,7 +131,6 @@ void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName)
     return;
   
   int volId = xafp_find_volume_id(hnd, pVolumeName);
-
   if (volId)
   {
     _client_context* pCtx = (_client_context*)hnd;
@@ -147,21 +152,23 @@ xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath)
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    std::string dir = path.substr(pos);    
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return NULL;
+  
+  _client_context* pCtx = (_client_context*)hnd;
+  std::string dir = path.substr(pos);    
 
-    CAFPNodeList* pList = NULL;
-    if (pCtx->session->GetNodeList(&pList, volId, path.c_str() + pos) == kNoError)
-    {
-      _fs_node_iterator* pIter = new _fs_node_iterator;
-      pIter->list = pList;
-      pIter->iter = pList->GetIterator();
-      return (xafp_node_iterator)pIter;
-    }
+  CAFPNodeList* pList = NULL;
+  if (pCtx->session->GetNodeList(&pList, volId, path.c_str() + pos) == kNoError)
+  {
+    _fs_node_iterator* pIter = new _fs_node_iterator;
+    pIter->list = pList;
+    pIter->iter = pList->GetIterator();
+    return (xafp_node_iterator)pIter;
   }
+
   return NULL;
 }
 
@@ -200,35 +207,35 @@ int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+  
+  _client_context* pCtx = (_client_context*)hnd;
+  CNodeParams* pParams = NULL;
+  if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams)) // Path does NOT include share/volume name
   {
-    _client_context* pCtx = (_client_context*)hnd;
-    CNodeParams* pParams = NULL;
-    if (!pCtx->session->Stat(volId, path.substr(pos).c_str(), &pParams)) // Path does NOT include share/volume name
+    if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
     {
-      if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
-      {
-        memset(pStat, 0, sizeof(*pStat));
-        xafp_node_info* pInfo = pParams->GetInfo();
-        pStat->st_dev = volId; // Substitute volume for device
-        pStat->st_ino = pInfo->nodeId;
-        pStat->st_mode = (pInfo->isDirectory ? 0x0040000 : 0x0100000) | AFPRightsToUnixRights(pInfo->unixPrivs.userRights);
-        pStat->st_nlink = 0; ////////
-        pStat->st_uid = pInfo->unixPrivs.userId;
-        pStat->st_gid = pInfo->unixPrivs.groupId;
-        pStat->st_rdev = 0;///////
-        pStat->st_size = (pInfo->isDirectory ? 0 : pInfo->fileInfo.dataForkLen);
-        pStat->st_atime = pInfo->modDate;
-        pStat->st_mtime = pInfo->modDate;
-        pStat->st_ctime = pInfo->createDate;
-      }
-      return 0;
+      memset(pStat, 0, sizeof(*pStat));
+      xafp_node_info* pInfo = pParams->GetInfo();
+      pStat->st_dev = volId; // Substitute volume for device
+      pStat->st_ino = pInfo->nodeId;
+      pStat->st_mode = (pInfo->isDirectory ? 0x0040000 : 0x0100000) | AFPRightsToUnixRights(pInfo->unixPrivs.userRights);
+      pStat->st_nlink = 0; ////////
+      pStat->st_uid = pInfo->unixPrivs.userId;
+      pStat->st_gid = pInfo->unixPrivs.groupId;
+      pStat->st_rdev = 0;///////
+      pStat->st_size = (pInfo->isDirectory ? 0 : pInfo->fileInfo.dataForkLen);
+      pStat->st_atime = pInfo->modDate;
+      pStat->st_mtime = pInfo->modDate;
+      pStat->st_ctime = pInfo->createDate;
     }
-    delete pParams;
-    return -3;
+    return 0;
   }
-  return -2;
+  delete pParams;
+  return -3;
 }
 
 // Function: xafp_open_file
@@ -242,14 +249,14 @@ xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, int f
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    uint16_t mode = ((flags & xafp_open_flag_read) ? kFPForkRead : 0) | ((flags & xafp_open_flag_write) ? kFPForkWrite : 0); // Translate mode flags from xafp to AFP
-    return pCtx->session->OpenFile(volId, path.substr(pos).c_str(), mode); // Path does NOT include share/volume name
-  }
-  return -2;
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+  
+  _client_context* pCtx = (_client_context*)hnd;
+  uint16_t mode = ((flags & xafp_open_flag_read) ? kFPForkRead : 0) | ((flags & xafp_open_flag_write) ? kFPForkWrite : 0); // Translate mode flags from xafp to AFP
+  return pCtx->session->OpenFile(volId, path.substr(pos).c_str(), mode); // Path does NOT include share/volume name
 }
 
 // Function: xafp_read_file
@@ -302,16 +309,16 @@ int xafp_create_dir(xafp_client_handle hnd, const char* pPath, uint32_t flags /*
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    int dirId = pCtx->session->Create(volId, path.substr(pos).c_str(), true);
-    if (dirId > 0)
-      return 0; // TODO: Return dirId once error codes are normalized
-    return -3;
-  }
-  return -2;
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+
+  _client_context* pCtx = (_client_context*)hnd;
+  int dirId = pCtx->session->Create(volId, path.substr(pos).c_str(), true);
+  if (dirId > 0)
+    return 0; // TODO: Return dirId once error codes are normalized
+  return -3;
 }
 
 // Function: xafp_create_file
@@ -325,15 +332,15 @@ int xafp_create_file(xafp_client_handle hnd, const char* pPath, uint32_t flags /
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    if (!pCtx->session->Create(volId, path.substr(pos).c_str()))
-      return 0;
-    return -3;
-  }
-  return -2;  
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+
+  _client_context* pCtx = (_client_context*)hnd;
+  if (!pCtx->session->Create(volId, path.substr(pos).c_str()))
+    return 0;
+  return -3;
 }
 
 // Function: xafp_remove
@@ -348,15 +355,15 @@ int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
-  int volId = xafp_find_volume_id(hnd, volume.c_str());
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    if (pCtx->session->Delete(volId, path.substr(pos).c_str()) == kNoError)
-      return 0;
-    return -3;
-  }
-  return -2;
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+
+  _client_context* pCtx = (_client_context*)hnd;
+  if (pCtx->session->Delete(volId, path.substr(pos).c_str()) == kNoError)
+    return 0;
+  return -3;
 }
 
 int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNewPath)
@@ -373,15 +380,15 @@ int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNew
 
   std::string volume = path.substr(0, pos);
   if (volume != newPath.substr(0, newPos))
-    return -2; // Paths are on different volumes
+    return -3; // Paths are on different volumes
   
-  int volId = xafp_find_volume_id(hnd, volume.c_str()); // Make sure we are mounted
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    return pCtx->session->Move(volId, path.substr(pos).c_str(), newPath.substr(newPos).c_str());
-  }
-  return 0;
+  // Find the volume id (mount volume if necessary)
+  int volId = xafp_mount(hnd, volume.c_str());
+  if (volId <= 0)
+    return -2;
+
+  _client_context* pCtx = (_client_context*)hnd;
+  return pCtx->session->Move(volId, path.substr(pos).c_str(), newPath.substr(newPos).c_str());
 }
 
 // Context/Session Pool
