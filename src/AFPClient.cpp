@@ -95,6 +95,23 @@ void CAFPSession::Logout()
   SendCommand(reqBuf);
 }
 
+void CAFPSession::OnAttention(uint16_t attData)
+{
+  // If there is a message waiting for us, get it...
+  // TODO: Implement async response handling (completion proc) for this to work...
+  if (kMsgNotifyMask & attData)
+  {
+    CDSIBuffer reqBuf(6);
+    reqBuf.Write((uint8_t)FPGetSrvrMsg); // Command
+    reqBuf.Write((uint8_t)0); // Pad
+    reqBuf.Write((uint16_t)1); // Server Message
+    reqBuf.Write((uint16_t)0x3); // Request | Supports UTF-8
+    SendMessage(DSICommand, GetNewRequestId(), &reqBuf);
+
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Retrieved server message [STUB - REQUIRES ASYNC I/O!]");
+  }
+}
+
 int CAFPSession::OpenVolume(const char* pVolName)
 {
   if (!IsLoggedIn())

@@ -77,9 +77,13 @@ public:
              
   int Stat(int volumeId, const char* pPathSpec, CNodeParams** ppParams, int refId = 2);
   int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}
+    
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(CAFPCleartextAuthInfo* authInfo);
+
+  // Overrides from DSISession
+  virtual void OnAttention(uint16_t attData);
   
   bool m_LoggedIn;
   CAFPUserAuthInfo* m_pAuthInfo;

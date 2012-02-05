@@ -19,6 +19,7 @@
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
+#include "DSIProto.h"
 
 /////////////////////////////////////////////////////////////////////////////////
 // AFP Protocol Definitions/Constants
@@ -64,7 +65,7 @@ enum
   //  FPGetIconInfo
   //  FPGetSessionToken
   //  FPGetSrvrInfo
-  //  FPGetSrvrMsg
+  FPGetSrvrMsg = 38,
   //  FPGetSrvrParms
   //  FPGetUserInfo
   //  FPGetVolParms

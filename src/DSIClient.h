@@ -132,14 +132,18 @@ public:
   uint16_t GetNewRequestId(){return m_LastRequestId++;}
   
   int32_t SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse = NULL, uint32_t writeOffset = 0);
-
+  
   // ITCPReceiveCallback Implementation
   void OnReceive(CTCPPacketReader& reader); 
+  
 protected:
   int32_t SendMessage(uint8_t messageId, uint16_t requestId, CDSIBuffer* pPayload = NULL, uint32_t writeOffset = 0);
   bool AddRequest(DSIRequest* pRequest);
   DSIRequest* RemoveRequest(uint16_t id);
   void SignalAll(int err);
+
+  // Upstream notification handler
+  virtual void OnAttention(uint16_t attData);
   
   bool m_IsOpen;
   int16_t m_LastRequestId;

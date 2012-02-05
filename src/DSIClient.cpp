@@ -501,17 +501,19 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
           uint16_t attData;
           // TODO: Implement reconnect handler and heed delay specified by server in AFPUserBytes
           // TODO: Skip unexpected bytes, if present
+          // TODO: Retrieve quantum size during login
           if (hdr.totalDataLength > 2)
             XAFP_LOG(XAFP_LOG_FLAG_ERROR,"DSI Protocol: ****Unexpected Size for Attention Data**** (%d bytes)", hdr.totalDataLength);
           reader.Read(&attData, sizeof(uint16_t)); // TODO: Where should we handle read() failures
           attData = ntohs(attData); // Handle byte-ordering
-          // TODO: Retrieve the server message when there is one
           XAFP_LOG(XAFP_LOG_FLAG_INFO, "DSI Protocol: Received Server Attention. Flags - Shutdown:%s, ServerCrash:%s, Message:%s, NoReconnect:%s",
                    (kShutDownNotifyMask & attData) ? "yes" : "no",
                    (kAllowReconnectMask & attData) ? "yes" : "no",
                    (kMsgNotifyMask & attData) ? "yes" : "no",
                    (kDisconnectNotifyMask & attData) ? "yes" : "no"
                    );
+          // TODO: Retrieve the server message when there is one
+          OnAttention(attData);
           break;
         case DSICloseSession: // Notification from server that the session will be closed. 
           // Signal all waiting callers and tell them something happened
@@ -589,6 +591,7 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
           }
           else
           {
+            XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Unexpected reply - RequestId: %d", hdr.requestID);
             // TODO: Need a better flush/skip/seek method
             void* p = malloc(hdr.totalDataLength);
             reader.Read(p, hdr.totalDataLength);
@@ -604,6 +607,11 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
 }
 
 // TODO: Global var == NoNo...
+void CDSISession::OnAttention(uint16_t attData)
+{
+  XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: ATTENTION!!");
+}
+
 bool CDSISession::AddRequest(DSIRequest* pRequest)
 {
   // TODO: Add to request map...error if duplicate id
