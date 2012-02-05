@@ -298,6 +298,7 @@ CDSISession::~CDSISession()
 }
 
 ////TEMP
+// TODO: FIXME!
 void init_request(DSIRequest& req, CDSIBuffer* pBuf)
 {
   req.pEvent = new CThreadSyncEvent();
@@ -606,7 +607,6 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
   }
 }
 
-// TODO: Global var == NoNo...
 void CDSISession::OnAttention(uint16_t attData)
 {
   XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: ATTENTION!!");

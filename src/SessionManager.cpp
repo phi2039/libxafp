@@ -65,10 +65,10 @@ _client_context* CSessionManager::GetContext(const char* pHost, unsigned int por
   std::pair<context_map::iterator,context_map::iterator> range = m_Contexts.equal_range(lookupId);
   for (context_map::iterator it = range.first; it != range.second; ++it)
   {
-    XAFP_LOG(XAFP_LOG_FLAG_SESS_MGR, "Session Manager: Reusing context [%s]", lookupId.c_str());
     // If this one is idle, use it...
     if (it->second.isIdle)
     {
+      XAFP_LOG(XAFP_LOG_FLAG_SESS_MGR, "Session Manager: Reusing context [%s, 0x%08x]", lookupId.c_str(), it->second.ctx);
       it->second.isIdle = false; // No longer idle...
       // TODO: Do we need to verify that the connection is good...?
       return it->second.ctx; // We are done. 
@@ -76,12 +76,12 @@ _client_context* CSessionManager::GetContext(const char* pHost, unsigned int por
   }
   
   // No open and/or idle contexts were found. Create a new one.
-  XAFP_LOG(XAFP_LOG_FLAG_INFO, "Session Manager: Creating new context [%s]", lookupId.c_str());
   _client_context* ctx = xafp_create_context(pHost, port, pUser, pPass);
   
   // Add the new context to the map
   context_record rec = {ctx, false, 0, time(NULL)};  
   m_Contexts.insert(std::pair<context_id,context_record>(lookupId, rec));
+  XAFP_LOG(XAFP_LOG_FLAG_INFO, "Session Manager: Created new context [%s, 0x%08x] - count: %d", lookupId.c_str(), ctx, m_Contexts.size());
   
   return ctx;
 }
@@ -96,7 +96,7 @@ void CSessionManager::FreeContext(_client_context* pCtx)
     // Once we find it, free it up
     if (it->second.ctx == pCtx)
     {
-      XAFP_LOG(XAFP_LOG_FLAG_SESS_MGR, "Session Manager: Freeing context [%s]", it->first.c_str());
+      XAFP_LOG(XAFP_LOG_FLAG_SESS_MGR, "Session Manager: Freeing context [%s, 0x%08x]", it->first.c_str(), pCtx);
       it->second.isIdle = true;
     }
   }
@@ -110,7 +110,7 @@ int CSessionManager::MonitorThreadProc()
   
   while (true)
   {
-    // TODO: Use wait with timeout instead of sleep, so that we can trigger a speedy exit...
+    // TODO: Use wait with timeout instead of sleep, so that we can trigger a speedier exit...
     sleep(1);
 
     if (m_MonitorThreadQuitFlag)
@@ -138,7 +138,7 @@ int CSessionManager::MonitorThreadProc()
           if (rec.idleTime >= m_SessionTimeout)
           {
             // Remove the record from the map, and stage the context for deletion
-            XAFP_LOG(XAFP_LOG_FLAG_INFO, "Session Manager: Removing expired context [%s]", it->first.c_str());
+            XAFP_LOG(XAFP_LOG_FLAG_INFO, "Session Manager: Removing expired context [%s, 0x%08x] - count %d", it->first.c_str(), rec.ctx, m_Contexts.size());
             staleContexts.push_back(rec.ctx);
             m_Contexts.erase(it);
           }
