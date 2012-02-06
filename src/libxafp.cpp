@@ -58,7 +58,6 @@ xafp_client_handle xafp_create_context(const char* pServer, unsigned int port/*=
   else
     pCtx->password = NULL;
   
-  pCtx->volumes = new volume_map();
   pCtx->session = new CAFPSession();
   
   return pCtx;
@@ -76,7 +75,6 @@ void xafp_destroy_context(xafp_client_handle hnd)
   
   _client_context* pCtx = (_client_context*)hnd;
   
-  delete pCtx->volumes;
   delete pCtx->session;
   
   free(pCtx->server_dns_name);
@@ -87,57 +85,9 @@ void xafp_destroy_context(xafp_client_handle hnd)
 
 // TODO: Return useful error codes...
 
-// Volume Mount/Unmount
+// Volume Management
 //////////////////////////////////////
-int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags/*=xafp_mount_flag_none*/)
-{
-  if (!hnd)
-    return -4;
-  
-  if (!pVolumeName)
-    return -5;
-
-  // TODO: Allow for re-mounting with different flags (r/w)
-  int res = xafp_find_volume_id(hnd, pVolumeName);
-  if (res > 0)
-    return res; // Already mounted. No need to re-mount.
-    
-  _client_context* pCtx = (_client_context*)hnd;
-    
-  // This interface is late-binding, so the first mount request triggers connect/login
-  if (!pCtx->session->IsLoggedIn())
-  {
-    if (!pCtx->session->IsConnected())
-    {
-      if (!pCtx->session->Open(pCtx->server_dns_name, pCtx->port, 3000))
-        return -1;
-    }
-    if (!pCtx->session->Login(pCtx->username,pCtx->password))
-      return -2;
-  }
-  
-  res = pCtx->session->OpenVolume(pVolumeName);
-  if (res < 0)
-    return -3;
-  
-  pCtx->volumes->insert(volume_map_entry(pVolumeName, res));
-  
-  return res;
-}
-
-void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName)
-{
-  if (!hnd || !pVolumeName)
-    return;
-  
-  int volId = xafp_find_volume_id(hnd, pVolumeName);
-  if (volId)
-  {
-    _client_context* pCtx = (_client_context*)hnd;
-    pCtx->session->CloseVolume(volId);    
-    pCtx->volumes->erase(pVolumeName);
-  }
-}
+// TODO: Add reference counting so that we can close unused volumes... For now, they stay open once we open them...
 
 // Node Listing/Iteration
 //////////////////////////////////////
@@ -145,21 +95,72 @@ xafp_node_iterator xafp_get_dir_iter(xafp_client_handle hnd, const char* pPath)
 {
   if (!hnd)
     return NULL;
-  
+    
   // TODO: Make this more reliable and complete
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  
+  // Handle special case where caller requests a directory iterator for the server root (volume list)
+  // TODO: Implement a more elegant method to do this... Really should be using an interface for abstraction.
+  if (path.length() == 0)
+  {
+    if (xafp_get_volume(hnd, "") < 0) // Force login if the session is not already active
+      return NULL; // Failed to open the session
+      
+    // Get a list of volumes from the server
+    _client_context* pCtx = (_client_context*)hnd;
+    
+    AFPServerVolumeList volumes;
+    if (!pCtx->session->GetVolumeList(volumes))
+      return NULL;
+    
+    // Build a 'spoofed' reply packet that can be parsed as if it were a real enum reply
+    uint16_t count = volumes.size();
+    CDSIBuffer* pBuf = new CDSIBuffer(64 * count);
+    
+    uint16_t fileBitmap = 0;
+    uint16_t dirBitmap = kFPAttributeBit | kFPUTF8NameBit | kFPUnixPrivsBit | kFPModDateBit | kFPOffspringCountBit;
+    pBuf->Write((uint16_t)0); // File Bitmap
+    pBuf->Write((uint16_t)dirBitmap); // Directory Bitmap
+    pBuf->Write((uint16_t)count); // Count
 
+    for (AFPServerVolumeIterator it = volumes.begin(); it < volumes.end(); it++)
+    {
+      pBuf->Write((uint16_t)((*it).name.length() + 6 + 35)); // Size
+      pBuf->Write((uint8_t)0x80); // Directory Flag      
+      pBuf->Write((uint8_t)0x00); // Pad
+      pBuf->Write((uint16_t)(0x02 | 0x20 | 0x40 | 0x100)); // Attributes (kAttrIsExpFolder: 0x02, kFPWriteInhibitBit: 0x20, kFPRenameInhibitBit: 0x40, kFPDeleteInhibitBit: 0x100)
+      pBuf->Write((uint32_t)Time_tToAFPTime(time(NULL))); // Modified Date
+      pBuf->Write((uint16_t)0); // Offspring Count (Not sure if this needs to be > 0 or not...)
+      pBuf->Write((uint16_t)31); // UTF-8 Name Offset
+      pBuf->Write((uint32_t)0); // Pad (Not sure why this is needed, but it is...)
+      pBuf->Write((uint32_t)0); // Unix UID (root)
+      pBuf->Write((uint32_t)0); // Unix GID (root)
+      pBuf->Write((uint32_t)(0x0040000 | AFPRightsToUnixRights(0x02020202))); // Permissions (r--r--r--) or 0x124
+      pBuf->Write((uint32_t)0x02020202); // Access Rights (r--r--r--r--)
+      pBuf->WritePathSpec((*it).name.c_str());
+    }
+    CAFPNodeList* pList = new CAFPNodeList(pBuf, dirBitmap, fileBitmap, count);
+    _fs_node_iterator* pIter = new _fs_node_iterator;
+    pIter->list = pList;
+    pIter->iter = pList->GetIterator();
+    return (xafp_node_iterator)pIter;
+  }
+  
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return NULL;
   
   _client_context* pCtx = (_client_context*)hnd;
-  std::string dir = path.substr(pos);    
-
+  std::string dir;
+  if (pos > 0)
+    dir = path.substr(pos);
+  else
+    dir = path;
+  
   CAFPNodeList* pList = NULL;
   if (pCtx->session->GetNodeList(&pList, volId, path.c_str() + pos) == kNoError)
   {
@@ -198,17 +199,40 @@ void xafp_free_iter(xafp_node_iterator iter)
 // File I/O
 //////////////////////////////////////
 // TODO: Address structure size differences for 'stat' structure
-int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat)
+int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat/*=NULL*/)
 {
   if (!hnd || !pPath)
     return -1;
   
   // TODO: Make this more reliable and complete (implement wrapper class?)
   std::string path = (pPath[0] == '/') ? pPath + 1 : pPath; // Strip the leading '/' if there is one
+  
+  // Handle special case where caller stat's the server root
+  if (path.length() == 0)
+  {
+    // Build an explicit stat structure for the server root
+    if (pStat) // Caller wants the file info back, otherwise they were just seeing if it existed...
+    {
+      memset(pStat, 0, sizeof(*pStat));
+      pStat->st_dev = 0; // Not really relevant...
+      pStat->st_ino = 0; // Not really relevant...
+      pStat->st_mode = 0x0040000 | AFPRightsToUnixRights(0x02020202);
+      pStat->st_nlink = 0; 
+      pStat->st_uid = 0; // root
+      pStat->st_gid = 0; // root
+      pStat->st_rdev = 0;
+      pStat->st_size = 0;
+      pStat->st_atime = Time_tToAFPTime(time(NULL));
+      pStat->st_mtime = pStat->st_atime;
+      pStat->st_ctime = pStat->st_atime;
+    }
+    return 0;
+  }  
+  
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
   
@@ -250,7 +274,7 @@ xafp_file_handle xafp_open_file(xafp_client_handle hnd, const char* pPath, int f
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
   
@@ -310,7 +334,7 @@ int xafp_create_dir(xafp_client_handle hnd, const char* pPath, uint32_t flags /*
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
 
@@ -333,7 +357,7 @@ int xafp_create_file(xafp_client_handle hnd, const char* pPath, uint32_t flags /
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
 
@@ -356,7 +380,7 @@ int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags /*=0*/
   int pos = path.find('/');
   std::string volume = path.substr(0, pos);
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
 
@@ -383,7 +407,7 @@ int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNew
     return -3; // Paths are on different volumes
   
   // Find the volume id (mount volume if necessary)
-  int volId = xafp_mount(hnd, volume.c_str());
+  int volId = xafp_get_volume(hnd, volume.c_str());
   if (volId <= 0)
     return -2;
 
@@ -437,4 +461,44 @@ void xafp_destroy_context_pool(xafp_context_pool_handle hnd)
   delete pPool->manager;
   
   free(pPool);
+}
+
+// Internal functions
+//////////////////////////////////////////////////////////
+int xafp_get_volume(xafp_client_handle hnd, const char* pVolumeName)
+{
+  if (!hnd)
+    return -4;
+  
+  if (!pVolumeName)
+    return -5;
+  
+  _client_context* pCtx = (_client_context*)hnd;  
+  
+  // This interface is late-binding, so the first mount request triggers connect/login
+  if (!pCtx->session->IsLoggedIn())
+  {
+    if (!pCtx->session->IsConnected())
+    {
+      if (!pCtx->session->Open(pCtx->server_dns_name, pCtx->port, 3000))
+        return -1;
+    }
+    if (!pCtx->session->Login(pCtx->username,pCtx->password))
+      return -2;
+  }
+  
+  // Do not try to mount zero-length volume (but allow callers to use it to force login)
+  // TODO: There must be a better way to do this...
+  if (strlen(pVolumeName) == 0)
+    return 0;
+  
+  // See if this volume is already mounted
+  int volId = pCtx->session->GetVolumeStatus(pVolumeName);
+  if (!volId)
+  {
+    // The volume was not mounted, mount it now
+    volId = pCtx->session->OpenVolume(pVolumeName);
+  }
+  
+  return volId;
 }

@@ -49,6 +49,32 @@ protected:
   char m_Password[9]; // 8 char max + NULL
 };
 
+struct AFPServerVolume
+{
+  bool hasPassword;
+  bool hasConfigInfo;
+  std::string name;
+};
+
+typedef std::vector<AFPServerVolume> AFPServerVolumeList;
+typedef AFPServerVolumeList::iterator AFPServerVolumeIterator;
+
+class CAFPServerParameters
+{
+public:
+  CAFPServerParameters(CDSIBuffer& buf);
+  virtual ~CAFPServerParameters();  
+  bool IsValid() {return m_IsValid;}
+  
+  bool GetVolumeList(AFPServerVolumeList& list);
+protected:
+  bool Parse(CDSIBuffer& buf);
+  bool m_IsValid;
+  
+  time_t m_ServerTimeOffset;
+  AFPServerVolumeList m_Volumes;
+};
+
 // AFP Session Handling
 /////////////////////////////////////////////////////////////////////////////////
 class CAFPSession : public CDSISession
@@ -59,6 +85,8 @@ public:
   bool Login(const char* pUsername, const char* pPassword);
   void Logout();
   int OpenVolume(const char* pVolName);
+  int GetVolumeStatus(const char* pVolName); // Retrieve mount status/mode for a volume
+  bool GetVolumeList(AFPServerVolumeList& list, bool reload=false);
   void CloseVolume(int volId);
   bool IsLoggedIn() {return m_LoggedIn;}
   
@@ -77,15 +105,22 @@ public:
              
   int Stat(int volumeId, const char* pPathSpec, CNodeParams** ppParams, int refId = 2);
   int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}
-    
+  
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(CAFPCleartextAuthInfo* authInfo);
+  bool LoginGuest();
+
+  bool RequestServerParams();
 
   // Overrides from DSISession
   virtual void OnAttention(uint16_t attData);
   
+  // Session State Information
   bool m_LoggedIn;
   CAFPUserAuthInfo* m_pAuthInfo;
+  CAFPServerParameters* m_pServerParams;
+  
+  std::map<std::string, int> m_MountedVolumes;
   
 };

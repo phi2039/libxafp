@@ -31,12 +31,55 @@
 
 // TODO: List
 // - Improve string/path handling. There is a lot of pointless copying going on...
+// - Add file reference counting so that open files can be closed on disconnect
+
+// Server Parameter Helper Class
+/////////////////////////////////////////////////////////////////////////////////
+CAFPServerParameters::CAFPServerParameters(CDSIBuffer& buf)
+{
+  m_IsValid = Parse(buf);
+}
+
+CAFPServerParameters::~CAFPServerParameters()
+{
+  
+}
+
+bool CAFPServerParameters::Parse(CDSIBuffer& buf)
+{
+  // TODO: Add data length validation
+  m_ServerTimeOffset = AFPTimeToTime_t(buf.Read32()) - time(NULL);
+  uint8_t volumeCount = buf.Read8();
+  XAFP_LOG(XAFP_LOG_LEVEL_INFO, "AFP Protocol: Parse Server Parameters - Found %d volumes [Server time offset is %d hours]", volumeCount, m_ServerTimeOffset/3600);
+  for (int i = 0; i < volumeCount; i++)
+  {
+    AFPServerVolume vol;
+    uint8_t flags = buf.Read8();
+    vol.hasPassword = (flags & 0x80);
+    vol.hasConfigInfo = (flags & 0x01);
+    char volName[256];
+    buf.ReadString(volName, 255);
+    vol.name = volName;
+    m_Volumes.push_back(vol);
+
+    XAFP_LOG(XAFP_LOG_LEVEL_INFO, "AFP Protocol: \tFound Volume '%s' [hasPassword: %s, hasConfigInfo: %s]", volName, vol.hasPassword ? "yes" : "no", vol.hasConfigInfo ? "yes" : "no");
+  }
+  
+  return true;
+}
+
+bool CAFPServerParameters::GetVolumeList(AFPServerVolumeList& list)
+{
+  list = m_Volumes; // Deep copy
+  return true;
+}
 
 // AFP Session Handling
 /////////////////////////////////////////////////////////////////////////////////
 CAFPSession::CAFPSession() :
   m_LoggedIn(false),
-  m_pAuthInfo(NULL)
+  m_pAuthInfo(NULL),
+  m_pServerParams(NULL)
 {
   
 }
@@ -52,10 +95,20 @@ bool CAFPSession::Login(const char* pUsername, const char* pPassword)
   if (m_pAuthInfo)
     delete m_pAuthInfo;
   
-  m_pAuthInfo = new CAFPCleartextAuthInfo(pUsername, pPassword);
-  m_LoggedIn = LoginClearText((CAFPCleartextAuthInfo*)m_pAuthInfo);
-  
-  return m_LoggedIn;
+  if (!pUsername || !strlen(pUsername))
+    m_LoggedIn = LoginGuest();
+  else
+  {
+    m_pAuthInfo = new CAFPCleartextAuthInfo(pUsername, pPassword);
+    m_LoggedIn = LoginClearText((CAFPCleartextAuthInfo*)m_pAuthInfo);
+  }
+    
+  if (m_LoggedIn)
+  {
+    if (RequestServerParams())
+      return true;
+  }
+  return false;
 }   
 
 bool CAFPSession::LoginClearText(CAFPCleartextAuthInfo* pAuthInfo)
@@ -72,27 +125,85 @@ bool CAFPSession::LoginClearText(CAFPCleartextAuthInfo* pAuthInfo)
   memcpy(pwd, pAuthInfo->GetPassword(), len > 8 ? 8 : len);
   reqBuf.Write((void*)pwd, 8); // Password parameter is 8 bytes long
 
+  XAFP_LOG(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Logging in as %s", pAuthInfo->GetUserName());
+  uint32_t err = SendCommand(reqBuf);
+  return (err == kNoError);
+}
+
+bool CAFPSession::LoginGuest()
+{
+  CDSIBuffer reqBuf(strlen(kAFPVersion_3_1) + strlen(kNoUserAuthStr) + 1);
+  reqBuf.Write((uint8_t)FPLogin); // Command
+//  reqBuf.Write((uint8_t)0); // Pad
+  reqBuf.Write((char*)kAFPVersion_3_1); // AFP Version
+  reqBuf.Write((char*)kNoUserAuthStr); // UAM
+  reqBuf.Write((uint8_t)0); // Pad
+  
+  XAFP_LOG_0(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Logging in as [guest]");
   uint32_t err = SendCommand(reqBuf);
   return (err == kNoError);
 }
 
 void CAFPSession::Logout()
 {
-  if (m_pAuthInfo)
-  {
-    delete m_pAuthInfo;
-    m_pAuthInfo = NULL;
-  }
+  // TODO: Close all open resources (volumes, files, etc...)
+  delete m_pAuthInfo;
+  m_pAuthInfo = NULL;
+  
+  delete m_pServerParams;
+  m_pServerParams = NULL;  
   
   if (!IsLoggedIn())
     return;
   
   m_LoggedIn = false;
-  
+
   CDSIBuffer reqBuf(2);
   reqBuf.Write((uint8_t)FPLogout); // Command
   reqBuf.Write((uint8_t)0); // Pad
   SendCommand(reqBuf);
+}
+
+bool CAFPSession::RequestServerParams()
+{
+  if (!IsLoggedIn())
+    return kFPUserNotAuth;
+  
+  CDSIBuffer reqBuf(2);
+  reqBuf.Write((uint8_t)FPGetSrvrParms); // Command
+  
+  CDSIBuffer replyBuf;
+  uint32_t err = SendCommand(reqBuf, &replyBuf);
+  if (err == kNoError)
+  {
+    // This may get called out side the login/logout context, so mae sure we clean-up any previous data
+    if (m_pServerParams)
+    {
+      delete m_pServerParams;
+      m_pServerParams = NULL;
+    }
+    
+    m_pServerParams = new CAFPServerParameters(replyBuf);
+    if (m_pServerParams->IsValid())
+      return true; // Got what we needed...
+
+    delete m_pServerParams;
+    m_pServerParams = NULL;
+  }
+  XAFP_LOG_0(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Failed to retrieve server parameters");
+
+  return false;
+}
+
+bool CAFPSession::GetVolumeList(AFPServerVolumeList& list, bool reload/*=false*/)
+{
+  if (!m_pServerParams || reload)
+    RequestServerParams();
+  
+  if (m_pServerParams)
+    return m_pServerParams->GetVolumeList(list);
+  
+  return false;
 }
 
 void CAFPSession::OnAttention(uint16_t attData)
@@ -132,10 +243,19 @@ int CAFPSession::OpenVolume(const char* pVolName)
     if (bitmap & kFPVolIDBit)
     {
       uint16_t volID = replyBuf.Read16();
+      m_MountedVolumes[pVolName] = volID; // Insert into the mounted volume map
       return volID;      
     }
   }
-  return kNoError;  
+  return 0; // TODO: Need error codes for callers...  
+}
+
+int CAFPSession::GetVolumeStatus(const char* pVolName)
+{
+  std::map<std::string,int>::iterator it = m_MountedVolumes.find(pVolName);
+  if (it == m_MountedVolumes.end())
+    return 0; // Not mounted
+  return it->second; // Volume Id
 }
 
 void CAFPSession::CloseVolume(int volId)
@@ -146,6 +266,13 @@ void CAFPSession::CloseVolume(int volId)
   reqBuf.Write((uint16_t)volId); // Bitmap
   
   SendCommand(reqBuf);
+
+  // Remove the entry from the mounted volume map
+  for (std::map<std::string,int>::iterator it = m_MountedVolumes.begin(); it != m_MountedVolumes.end(); it++)
+  {
+    if (it->second == volId)
+      m_MountedVolumes.erase(it);
+  }
 }
 
 int CAFPSession::GetDirectoryId(int volumeId, const char* pPathSpec, int refId /*=2*/)
@@ -187,9 +314,9 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, const char* pP
   
   int len = strlen(pPathSpec);
   
-  // TODO: handle instances that require multiple calls (too many entries for one block)
+  // TODO: !!handle instances that require multiple calls (too many entries for one block)
   CDSIBuffer reqBuf(29); // TODO: This method of sizing the request block is WAAAY too error-prone...
-  // TODO: FPEnumerateExt2 requires AFPv3.1 - need to add support for FPEnumerateExt for AFPv3.0
+  // TODO: FPEnumerateExt2 requires AFPv3.1 - need to add support for FPEnumerateExt for AFPv3.0 (if we care...)
   reqBuf.Write((uint8_t)FPEnumerateExt2); // Command
   reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((uint16_t)volumeId);

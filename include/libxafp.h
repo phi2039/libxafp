@@ -60,13 +60,6 @@ void xafp_set_log_func(xafp_log_func_ptr func);
 
 // Client Interface Definition
 ///////////////////////////////////////////////////////
-enum xafp_mount_flags
-{
-  xafp_mount_flag_none   = 0x0,
-  xafp_mount_flag_read  = 0x1 << 0,
-  xafp_mount_flag_write = 0x1 << 1,
-};
-
 enum xafp_open_flags
 {
   xafp_open_flag_read   = 0x1 << 0,
@@ -135,12 +128,19 @@ struct xafp_node_info
   char* name;
 };
 
+// NOTE: Volumes are treated as directories, so all path specs should include them as the top-level folder.
+
+// Client Context/Session Management
+///////////////////////////////////////////////////////
 xafp_client_handle xafp_create_context(const char* pServer, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
 xafp_client_handle xafp_create_context(const char* pServer, const char* pUser, const char* pPass);
 void xafp_destroy_context(xafp_client_handle pCtx);
 
-int xafp_mount(xafp_client_handle hnd, const char* pVolumeName, xafp_mount_flags flags=xafp_mount_flag_none);
-void xafp_unmount(xafp_client_handle hnd, const char* pVolumeName);
+xafp_context_pool_handle xafp_create_context_pool(int timeout = 300);
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
+xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, const char* pUser=NULL, const char* pPass=NULL);
+void xafp_free_context(xafp_context_pool_handle hnd, xafp_client_handle ctx);
+void xafp_destroy_context_pool(xafp_context_pool_handle hnd);
 
 // Directory Navigation/Listing
 ///////////////////////////////////////////////////////
@@ -150,7 +150,7 @@ xafp_node_info* xafp_next(xafp_node_iterator iter);
 void xafp_free_iter(xafp_node_iterator iter);
 
 // Path spec includes share/volume name
-int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat);
+int xafp_stat(xafp_client_handle hnd, const char* pPath, struct stat* pStat=NULL);
 
 // File Management
 ///////////////////////////////////////////////////////
@@ -166,10 +166,3 @@ int xafp_rename_file(xafp_client_handle hnd, const char* pPath, const char* pNew
 
 int xafp_remove(xafp_client_handle hnd, const char* pPath, uint32_t flags=0);
 
-// Session Pool Definition
-///////////////////////////////////////////////////////
-xafp_context_pool_handle xafp_create_context_pool(int timeout = 300);
-xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, unsigned int port=548, const char* pUser=NULL, const char* pPass=NULL);
-xafp_client_handle xafp_get_context(xafp_context_pool_handle hnd, const char* pServer, const char* pUser=NULL, const char* pPass=NULL);
-void xafp_free_context(xafp_context_pool_handle hnd, xafp_client_handle ctx);
-void xafp_destroy_context_pool(xafp_context_pool_handle hnd);

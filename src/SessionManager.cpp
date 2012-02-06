@@ -49,7 +49,7 @@ void make_context_id(context_id& id, const char* pHost, unsigned int port, const
   id += ":";  
   id += portNo;
   id += ":";
-  id += pUser;
+  id += pUser ? pUser : "[guest]";
 }
 
 // Client Interface

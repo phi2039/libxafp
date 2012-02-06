@@ -66,7 +66,7 @@ enum
   //  FPGetSessionToken
   //  FPGetSrvrInfo
   FPGetSrvrMsg = 38,
-  //  FPGetSrvrParms
+  FPGetSrvrParms = 16,
   //  FPGetUserInfo
   //  FPGetVolParms
   //  FPListExtAttrs
