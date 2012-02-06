@@ -49,6 +49,13 @@ public:
   int Parse(uint32_t bitmap, uint8_t* pData, uint32_t size);
 };
 
+class CNodeParamIterator
+{
+public:
+  virtual CNodeParams* MoveNext() = 0;
+  virtual CNodeParams* GetCurrent() = 0;
+};
+
 class CAFPNodeList
 {
 public:
@@ -56,7 +63,7 @@ public:
   virtual ~CAFPNodeList();
   int GetSize(){return m_Count;}
   
-  class Iterator
+  class Iterator : CNodeParamIterator
   {
   public:
     Iterator(CDSIBuffer* pBuf, uint32_t dirBitmap, uint32_t fileBitmap);

@@ -24,6 +24,10 @@
   memcpy(_dst,((char*)_src + 1),*((uint8_t*)_src)); \
   _dst[*((uint8_t*)_src)] = '\0';
 
+// Node dates are represented by the number of seconds since '01/01/2000 00:00:00.0 UTC'
+#define AFPTimeToTime_t(t) (t + ((2000 - 1970) * 365 * 86400) + (7 * 86400)) // Adjust for differences in epoch, including leap years
+#define Time_tToAFPTime(t) (t - ((2000 - 1970) * 365 * 86400) + (7 * 86400)) // Adjust for differences in epoch, including leap years
+
 enum
 {
   kNoError = 0,
