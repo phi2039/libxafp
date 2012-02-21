@@ -96,18 +96,25 @@ bool CAFPSession::Login(const char* pUsername, const char* pPassword)
     delete m_pAuthInfo;
   
   if (!pUsername || !strlen(pUsername))
+  {
     m_LoggedIn = LoginGuest();
+    XAFP_LOG_0(XAFP_LOG_LEVEL_INFO, "AFP Protocol: Logging-in as Guest [Anonymous]");
+  }
   else
   {
+    XAFP_LOG(XAFP_LOG_LEVEL_INFO, "AFP Protocol: Logging-in as %s", pUsername);
     m_pAuthInfo = new CAFPCleartextAuthInfo(pUsername, pPassword);
     m_LoggedIn = LoginClearText((CAFPCleartextAuthInfo*)m_pAuthInfo);
   }
-    
+  
   if (m_LoggedIn)
   {
+    XAFP_LOG_0(XAFP_LOG_LEVEL_INFO, "AFP Protocol: Logged-in Successfully");
     if (RequestServerParams())
       return true;
   }
+  XAFP_LOG_0(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Login failed");
+
   return false;
 }   
 
@@ -125,7 +132,6 @@ bool CAFPSession::LoginClearText(CAFPCleartextAuthInfo* pAuthInfo)
   memcpy(pwd, pAuthInfo->GetPassword(), len > 8 ? 8 : len);
   reqBuf.Write((void*)pwd, 8); // Password parameter is 8 bytes long
 
-  XAFP_LOG(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Logging in as %s", pAuthInfo->GetUserName());
   uint32_t err = SendCommand(reqBuf);
   return (err == kNoError);
 }
@@ -134,12 +140,10 @@ bool CAFPSession::LoginGuest()
 {
   CDSIBuffer reqBuf(strlen(kAFPVersion_3_1) + strlen(kNoUserAuthStr) + 1);
   reqBuf.Write((uint8_t)FPLogin); // Command
-//  reqBuf.Write((uint8_t)0); // Pad
   reqBuf.Write((char*)kAFPVersion_3_1); // AFP Version
   reqBuf.Write((char*)kNoUserAuthStr); // UAM
   reqBuf.Write((uint8_t)0); // Pad
   
-  XAFP_LOG_0(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Logging in as [guest]");
   uint32_t err = SendCommand(reqBuf);
   return (err == kNoError);
 }
@@ -153,15 +157,16 @@ void CAFPSession::Logout()
   delete m_pServerParams;
   m_pServerParams = NULL;  
   
-  if (!IsLoggedIn())
-    return;
-  
-  m_LoggedIn = false;
+  if (IsLoggedIn())
+  {  
+    XAFP_LOG_0(XAFP_LOG_LEVEL_INFO, "AFP Protocol: Logging out...");
+    m_LoggedIn = false;
 
-  CDSIBuffer reqBuf(2);
-  reqBuf.Write((uint8_t)FPLogout); // Command
-  reqBuf.Write((uint8_t)0); // Pad
-  SendCommand(reqBuf);
+    CDSIBuffer reqBuf(2);
+    reqBuf.Write((uint8_t)FPLogout); // Command
+    reqBuf.Write((uint8_t)0); // Pad
+    SendCommand(reqBuf);
+  }
 }
 
 bool CAFPSession::RequestServerParams()
@@ -169,6 +174,7 @@ bool CAFPSession::RequestServerParams()
   if (!IsLoggedIn())
     return kFPUserNotAuth;
   
+  XAFP_LOG_0(XAFP_LOG_LEVEL_DEBUG, "AFP Protocol: Requesting server parameters...");
   CDSIBuffer reqBuf(2);
   reqBuf.Write((uint8_t)FPGetSrvrParms); // Command
   
@@ -190,7 +196,7 @@ bool CAFPSession::RequestServerParams()
     delete m_pServerParams;
     m_pServerParams = NULL;
   }
-  XAFP_LOG_0(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Failed to retrieve server parameters");
+  XAFP_LOG(XAFP_LOG_LEVEL_ERROR, "AFP Protocol: Failed to retrieve server parameters. error: %d", err);
 
   return false;
 }
@@ -227,7 +233,15 @@ int CAFPSession::OpenVolume(const char* pVolName)
 {
   if (!IsLoggedIn())
     return kFPUserNotAuth;
- 
+  
+  if (!pVolName)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) volume name passed to OpenVolume()");
+    return kFPParamErr;
+  }
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Opening Volume - %s", pVolName);
+
   CDSIBuffer reqBuf(4 + 1 + strlen(pVolName));
   reqBuf.Write((uint8_t)FPOpenVol); // Command
   reqBuf.Write((uint8_t)0); // Pad
@@ -244,6 +258,7 @@ int CAFPSession::OpenVolume(const char* pVolName)
     {
       uint16_t volID = replyBuf.Read16();
       m_MountedVolumes[pVolName] = volID; // Insert into the mounted volume map
+      XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Opened Volume - %s (id = %d)", pVolName, volID);
       return volID;      
     }
   }
@@ -252,6 +267,12 @@ int CAFPSession::OpenVolume(const char* pVolName)
 
 int CAFPSession::GetVolumeStatus(const char* pVolName)
 {
+  if (!pVolName)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) volume name passed to GetVolumeStatus()");
+    return -1;
+  }
+  
   std::map<std::string,int>::iterator it = m_MountedVolumes.find(pVolName);
   if (it == m_MountedVolumes.end())
     return 0; // Not mounted
@@ -260,6 +281,8 @@ int CAFPSession::GetVolumeStatus(const char* pVolName)
 
 void CAFPSession::CloseVolume(int volId)
 {
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Closing Volume (id: %d)", volId);
+
   CDSIBuffer reqBuf(4);
   reqBuf.Write((uint8_t)FPCloseVol); // Command
   reqBuf.Write((uint8_t)0); // Pad
@@ -271,12 +294,23 @@ void CAFPSession::CloseVolume(int volId)
   for (std::map<std::string,int>::iterator it = m_MountedVolumes.begin(); it != m_MountedVolumes.end(); it++)
   {
     if (it->second == volId)
+    {
+      XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Closed Volume - %s (id: %d)", it->first.c_str(), volId);
       m_MountedVolumes.erase(it);
+      return;
+    }
   }
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: 'Closed' Unmounted Volume (id: %d)", volId);
 }
 
 int CAFPSession::GetDirectoryId(int volumeId, const char* pPathSpec, int refId /*=2*/)
 {  
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to GetDirectoryId()");
+    return kParamError;
+  }  
+  
   int len = strlen(pPathSpec);
   CDSIBuffer reqBuf(13 + 4 + 1 + len + 1);
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
@@ -288,6 +322,8 @@ int CAFPSession::GetDirectoryId(int volumeId, const char* pPathSpec, int refId /
   reqBuf.Write((uint16_t)bitmap); // Directory Bitmap
   reqBuf.WritePathSpec(pPathSpec, len);
   
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Getting Directory Id for %s. Volume: %d", pPathSpec, volumeId);
+
   CDSIBuffer replyBuf;
   uint32_t err = SendCommand(reqBuf, &replyBuf);
   if (err == kNoError)
@@ -298,6 +334,7 @@ int CAFPSession::GetDirectoryId(int volumeId, const char* pPathSpec, int refId /
     if (isDir)
     {
       CDirParams params(bitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
+      XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Directory Id is %d (%s)", params.GetInfo()->nodeId, pPathSpec);
       return params.GetInfo()->nodeId;
     }
   }  
@@ -309,9 +346,20 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, const char* pP
   if (!IsLoggedIn())
     return kFPUserNotAuth;
 
-  if (!ppList)
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to GetNodeList()");
     return kParamError;
+  }  
   
+  if (!ppList)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) list pointer passed to GetNodeList()");
+    return kParamError;
+  }
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Getting node list for %s", pPathSpec);
+
   int len = strlen(pPathSpec);
   
   // TODO: !!handle instances that require multiple calls (too many entries for one block)
@@ -343,6 +391,7 @@ int CAFPSession::GetNodeList(CAFPNodeList** ppList, int volumeId, const char* pP
   }
   else
   {
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to fetch node list for %s (error=%d)", pPathSpec, err);
     delete pReplyBuf;
     return err;
   }
@@ -353,6 +402,13 @@ int CAFPSession::Stat(int volumeId, const char* pPathSpec, CNodeParams** pParams
   if (!IsLoggedIn())
     return kFPUserNotAuth;
 
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to Stat()");
+    return kParamError;
+  }  
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Stat'ing %s", pPathSpec);
   int len = strlen(pPathSpec);
   CDSIBuffer reqBuf(13 + 4 + 1 + len);
   reqBuf.Write((uint8_t)FPGetFileDirParms); // Command
@@ -393,9 +449,11 @@ int CAFPSession::Stat(int volumeId, const char* pPathSpec, CNodeParams** pParams
         ((CFileParams*)(*pParams))->Parse(fileBitmap, (uint8_t*)replyBuf.GetData() + 6, replyBuf.GetDataLen() - 6);
       }
     }
-    return 0; // TODO: Need error codes for callers...  
+    return 0; 
   }
-  return -1;
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Stat %s (error=%d)", pPathSpec, err);
+
+  return -1; // TODO: Need error codes for callers...  
 }
 
 int CAFPSession::OpenFile(int volumeId, const char* pPathSpec, uint16_t mode /*=kFPForkRead*/, int refId /*=2*/)
@@ -403,6 +461,13 @@ int CAFPSession::OpenFile(int volumeId, const char* pPathSpec, uint16_t mode /*=
   if (!IsLoggedIn())
     return -1;
 
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to OpenFile()");
+    return kParamError;
+  }  
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Opening File - %s (Volume Id = %d)", pPathSpec, volumeId);
   uint16_t len = strlen(pPathSpec);
   CDSIBuffer reqBuf(17 + len + 1);
   
@@ -420,8 +485,10 @@ int CAFPSession::OpenFile(int volumeId, const char* pPathSpec, uint16_t mode /*=
   {
     replyBuf.Skip(2); // Skip bitmap. We didn't request any params
     uint16_t forkId = replyBuf.Read16();
+    XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Opened File - %s (Fork Id = %d)", pPathSpec, forkId);
     return forkId;
   } 
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Open %s (error=%d)", pPathSpec, err);
   return 0;
 }
 
@@ -430,6 +497,14 @@ int CAFPSession::Create(int volumeId, const char* pPathSpec, bool dir /*=false*/
   if (!IsLoggedIn())
     return -1;
   
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to Create()");
+    return kParamError;
+  }  
+
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Create %s - %s (Volume Id = %d)", dir ? "Directory" : "File", pPathSpec, volumeId);
+
   uint16_t len = strlen(pPathSpec);
   CDSIBuffer reqBuf(15 + len + 1);
   
@@ -444,10 +519,18 @@ int CAFPSession::Create(int volumeId, const char* pPathSpec, bool dir /*=false*/
   if (err == kNoError)
   {
     if (dir)
-      return replyBuf.Read32();
+    {
+      int dirId = replyBuf.Read32();
+      XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Created Directory - %s (Id = %d)", pPathSpec, dirId);
+      return dirId;
+    }
     else
+    {
+      XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Created File - %s", pPathSpec);
       return 0;
+    }
   }
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Create %s (error=%d)", pPathSpec, err);
   return err;
 }
 
@@ -455,6 +538,14 @@ int CAFPSession::Delete(int volumeId, const char* pPathSpec, int refId /*=2*/)
 {
   if (!IsLoggedIn())
     return -1;
+  
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) path specifier passed to Delete()");
+    return kParamError;
+  }  
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Delete - %s (Volume Id = %d)", pPathSpec, volumeId);
   
   uint16_t len = strlen(pPathSpec);
   CDSIBuffer reqBuf(15 + len + 1);
@@ -466,6 +557,9 @@ int CAFPSession::Delete(int volumeId, const char* pPathSpec, int refId /*=2*/)
   reqBuf.WritePathSpec(pPathSpec, len);
   
   int32_t err = SendCommand(reqBuf);
+  if (err != kNoError)
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Delete %s (error=%d)", pPathSpec, err);
+    
   return err;
 }
 
@@ -473,6 +567,20 @@ int CAFPSession::Move(int volumeId, const char* pPathSpec, const char* pNewPathS
 {
   if (!IsLoggedIn())
     return -1;
+  
+  if (!pPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) source path specifier passed to Move()");
+    return kParamError;
+  }  
+    
+  if (!pNewPathSpec)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) destination path specifier passed to Move()");
+    return kParamError;
+  }  
+  
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Moving: %s -> %s (Volume Id = %d)", pPathSpec, pNewPathSpec, volumeId);
   
   std::string src = pPathSpec;
   std::string dest = pNewPathSpec;
@@ -500,6 +608,7 @@ int CAFPSession::Move(int volumeId, const char* pPathSpec, const char* pNewPathS
   if (err == kNoError)
     return 0;
     
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Move %s -> %s (error=%d)", pPathSpec, pNewPathSpec, err);
   return -3;
 }
 
@@ -508,6 +617,7 @@ void CAFPSession::CloseFile(int forkId)
   if (!IsLoggedIn())
     return;
   
+  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Closing File (Fork Id = %d)", forkId);
   CDSIBuffer reqBuf(4);
   reqBuf.Write((uint8_t)FPCloseFork); // Command
   reqBuf.Write((uint8_t)0); // Flag (File Fork)
@@ -521,6 +631,13 @@ int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
   if (!IsLoggedIn())
     return -1;
   
+  if (!pBuf)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) buffer passed to ReadFile()");
+    return kParamError;
+  }  
+
+//  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Reading %d bytes from File (Fork Id = %d)", len, forkId);
   CDSIBuffer reqBuf(20);
   reqBuf.Write((uint8_t)FPReadExt); // Command
   reqBuf.Write((uint8_t)0); // Pad
@@ -537,6 +654,7 @@ int CAFPSession::ReadFile(int forkId, uint64_t offset, void* pBuf, uint32_t len)
     return len;
   }
   
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Read from file (forkId=%d, error=%d)",forkId, err);
   return 0;
 }
 
@@ -547,6 +665,13 @@ int CAFPSession::WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len
   if (!IsLoggedIn())
     return -1;
   
+  if (!pBuf)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: (NULL) buffer passed to WriteFile()");
+    return kParamError;
+  }  
+  
+  //  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Writing %d bytes to File (Fork Id = %d)", len, forkId);
   CDSIBuffer reqBuf(20 + len);
   reqBuf.Write((uint8_t)FPWriteExt); // Command
   reqBuf.Write((uint8_t)0); // Flag (Offset from start of file)
@@ -561,6 +686,7 @@ int CAFPSession::WriteFile(int forkId, uint64_t offset, void* pBuf, uint32_t len
   if (err == kNoError)
     return len;
 
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Write to (forkId=%d, error=%d)", forkId, err);
   return 0;
 }
 
@@ -569,6 +695,7 @@ int CAFPSession::FlushFile(int forkId)
   if (!IsLoggedIn())
     return -1;
   
+  //  XAFP_LOG(XAFP_LOG_FLAG_AFP_PROTO, "AFP Protocol: Flushing File (Fork Id = %d)", forkId);
   CDSIBuffer reqBuf(4);
   reqBuf.Write((uint8_t)FPFlushFork); // Command
   reqBuf.Write((uint8_t)0); // Pad
@@ -577,6 +704,8 @@ int CAFPSession::FlushFile(int forkId)
   uint32_t err = SendCommand(reqBuf);
   if (err == kNoError)
     return 0;
+
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Flush file (forkId=%d, error=%d)", forkId, err);
   return -2;
 }
 

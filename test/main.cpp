@@ -145,21 +145,6 @@ void cat(const char* path, void* pBuf, int len, const char* host, const char* us
 void mv(const char* path, const char* newPath, const char* host, const char* username, const char* pass, uint32_t offset=0)
 {
   xafp_client_handle ctx = get_context(host, username, pass);
-//
-//  // Authenticate and open the desired volume
-//  char volume[128];
-//  if (path[0] == '/')
-//    path++; //offset start by one to account for leading '/'
-//  
-//  char* pVol = strstr(path, "/"); // Find volume name separator
-//  if (pVol)
-//  {
-//    int pos = pVol - path;
-//    strncpy(volume, path, pos);
-//    volume[pos] = 0;
-//  }
-//  else
-//    return;
   
   xafp_rename_file(ctx, path, newPath);
   
