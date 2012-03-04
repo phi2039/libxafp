@@ -106,17 +106,71 @@ protected:
   const uint32_t m_HeadRoom;
 };
 
-struct DSIRequest
+class CDSIRequest
 {
-  uint16_t id;
-  CThreadSyncEvent* pEvent;
-  uint32_t result;
-  CDSIBuffer* pResponseBuffer; // Optional
+public:
+  virtual ~CDSIRequest();
+  uint16_t GetId() {return m_Id;}
+  int GetResult() {return m_Result;}
+
+  virtual void Cancel(uint32_t reason) = 0;
+  virtual void Complete(uint32_t result) = 0;
+
+  int SaveResponse(CTCPPacketReader& reader, uint32_t totalBytes);
+  int AppendResponse(CTCPPacketReader& reader);
+  bool IsOngoing();
+  
+  uint32_t GetTotalBytes()
+  {
+    return m_TotalBytes;
+  }
+  uint32_t GetBytesRemaining()
+  {
+    return m_BytesRemaining;
+  }
+  uint32_t GetPieces()
+  {
+    return m_Pieces;
+  }
+protected:
+  CDSIRequest(uint16_t id, CDSIBuffer* pResponseBuf=NULL);
+  uint32_t UpdateOngoing(uint32_t bytesRead);
+  uint16_t m_Id;
+  int m_Result;
+  CDSIBuffer* m_pResponse;
   // Used for ongoing replies...
-  uint32_t totalBytes;
-  uint32_t bytesRemaining;
-  uint32_t pieces;
+  uint32_t m_TotalBytes;
+  uint32_t m_BytesRemaining;
+  uint32_t m_Pieces;  
 };
+
+class CDSISyncRequest : public CDSIRequest
+{
+public:
+  CDSISyncRequest(uint16_t id, CDSIBuffer* pResponseBuf=NULL);
+  virtual ~CDSISyncRequest();
+  bool Wait(int timeout=-1);
+  
+  virtual void Cancel(uint32_t reason);
+  virtual void Complete(uint32_t result);
+  
+protected:
+  void Signal();
+  CThreadSyncEvent* m_pEvent;
+};
+
+class CDSIAsyncRequest : public CDSIRequest
+{
+public:
+  CDSIAsyncRequest(uint16_t id, CDSIBuffer* pResponseBuf=NULL);
+  virtual ~CDSIAsyncRequest();
+
+  virtual void Cancel(uint32_t reason);
+  virtual void Complete(uint32_t reason);
+  
+protected:
+};
+
 
 class CDSISession : public CTCPSession, public ITCPReceiveCallback  // TODO: Technically, DSI can operate over protocols other than TCP...we are being lazy for now...
 {
@@ -138,16 +192,15 @@ public:
   
 protected:
   int32_t SendMessage(uint8_t messageId, uint16_t requestId, CDSIBuffer* pPayload = NULL, uint32_t writeOffset = 0);
-  bool AddRequest(DSIRequest* pRequest);
-  DSIRequest* RemoveRequest(uint16_t id);
+  bool AddRequest(CDSIRequest* pRequest);
+  CDSIRequest* RemoveRequest(uint16_t id);
   void SignalAll(int err);
 
   // Upstream notification handler
   virtual void OnAttention(uint16_t attData);
-  
   bool m_IsOpen;
   int16_t m_LastRequestId;
   CFPServerInfo m_ServerInfo;
-  std::map<int, DSIRequest*> m_Requests;
-  DSIRequest* m_pOngoingReply;
+  std::map<int, CDSIRequest*> m_Requests;
+  CDSIRequest* m_pOngoingReply;
 };

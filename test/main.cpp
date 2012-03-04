@@ -2,6 +2,8 @@
 #include <iostream>
 #include "../include/libxafp.h"
 
+#include "../src/Utils.h"
+
 xafp_context_pool_handle pool = NULL;
 
 xafp_client_handle get_context(const char* host, const char* username, const char* pass)
@@ -164,22 +166,64 @@ bool exists(const char* path, const char* host, const char* username, const char
   return res;
 }
 
+
+
+class test
+{
+public:
+  void foo(char* p) 
+  {
+    printf("%s\r\n",p);
+  }
+  
+  void bar(void* p) 
+  {
+    int a = 0;
+    a++;
+  }
+};
+
+class other
+{
+public:
+  void phi(char* p)
+  {
+    printf("%s\r\n",p);
+  }
+};
+
+void splat()
+{
+  test x;
+  
+  TCallbackFunctor<test, char*> a(&x,&test::foo);
+  TCallbackFunctor<test, char*> b(&x,&test::foo);
+  TCallbackFunctor<test, void*> c(&x,&test::bar);
+  
+  TFunctor<char*>* vtable[2] = {&a, &b};
+  
+  vtable[0]->Call("Hello");
+  (*vtable[1])("World");
+  
+  c(&x);
+}
+
 int main (int argc, char * const argv[]) 
 {
-  xafp_set_log_level(XAFP_LOG_LEVEL_INFO | XAFP_LOG_FLAG_DSI_PROTO | XAFP_LOG_FLAG_SESS_MGR);
+  xafp_set_log_level(XAFP_LOG_LEVEL_INFO);// | XAFP_LOG_FLAG_DSI_PROTO | XAFP_LOG_FLAG_SESS_MGR);
   char secret[32];
   FILE* fsecret = fopen(argv[1], "r");
   fread(secret, 1, sizeof(secret), fsecret);
 
   char* host = "kennel";
-  char* user = NULL;//"chris";
-//  char* lsDir = "/Media/video/Movies/BRRip";
-  char* lsDir = "/";
+  char* user = "chris";
+  char* lsDir = "/Media/video/Movies/BRRip";
+//  char* lsDir = "/";
   char* mkDir = "/Media/video/Test/foo";
   char* touchFile = "/Media/video/Test/bar.txt";
   char* touchText = "Hello World!\n";
   char* mvDest = "/Media/video/Test/bar2.txt";
-  bool doCopy = false;
+  bool doCopy = true;
   char* copySource = "/Media/video/Movies/BRRip/Aeon Flux.mp4";
   char* copyDest = "/Users/chris/test.mp4";
   
@@ -196,7 +240,10 @@ int main (int argc, char * const argv[])
   {
     mkdir(mkDir,host,user,secret);
     if (exists(mkDir, host, user, secret))
+    {
+      printf("XAFP Test: Success - created [%s]\n", mkDir);
       rm(mkDir,host,user,secret);
+    }
     else
       printf("XAFP Test: Failed to create mkDir [%s]\n", mkDir);
   }
@@ -208,13 +255,19 @@ int main (int argc, char * const argv[])
   {
     touch(touchFile,host,user,secret);
     if (exists(touchFile, host, user, secret))
+    {
+      printf("XAFP Test: Success - created [%s]\n", touchFile);
       cat(touchFile,touchText, strlen(touchText),host,user,secret);
+    }
     else
       printf("XAFP Test: Failed to create touchFile [%s]\n", touchFile);
     
     mv(touchFile, mvDest,host,user,secret);
     if (exists(mvDest, host, user, secret))
+    {
+      printf("XAFP Test: Success - moved [%s -> %s]\n", touchFile, mvDest);
       rm(mvDest,host,user,secret);
+    }
     else
     {
       printf("XAFP Test: Failed to move touchFile [%s -> %s]\n", touchFile, mvDest);

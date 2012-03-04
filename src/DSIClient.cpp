@@ -279,7 +279,139 @@ bool CFPServerInfo::Parse(uint8_t* pBuf, uint32_t len)
   return true;
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+// DSI Requests (Base/Sync/Async)
+/////////////////////////////////////////////////////////////////////////////////
+CDSIRequest::CDSIRequest(uint16_t id, CDSIBuffer* pResponseBuf/*=NULL*/) : 
+  m_Id(id), 
+  m_Result(kNoError), 
+  m_TotalBytes(0), 
+  m_BytesRemaining(0), 
+  m_Pieces(0), 
+  m_pResponse(pResponseBuf) 
+{
 
+};
+
+CDSIRequest::~CDSIRequest() 
+{
+};
+
+int CDSIRequest::SaveResponse(CTCPPacketReader& reader, uint32_t totalBytes)
+{
+  // TODO: Handle case where we don't find what we expected (maybe client timed-out...) - another use for buffer 'skip' code
+  // TODO: Handle case where this is called, but we already have an ongoing operation in-process
+  if (totalBytes && m_pResponse)
+  {
+    // Reset the read context
+    m_Pieces = 0;
+    m_TotalBytes = totalBytes;
+    m_BytesRemaining = totalBytes;
+    
+    m_pResponse->Resize(m_TotalBytes); // Make sure we have somewhere to put the data (including possible ongoing reads)
+
+    int bytesRead = reader.Read(m_pResponse->GetData(), m_TotalBytes);
+    if (bytesRead > 0) // All OK
+    {  
+      // TODO: Shouldn't the current data len always be zero when we start? Why do we need GetDataLen() here?
+      m_pResponse->SetDataLen(m_pResponse->GetDataLen() + bytesRead); // Size so far (might not be final size)
+      m_BytesRemaining -= (bytesRead > m_BytesRemaining) ? m_BytesRemaining : bytesRead;
+      
+      // If the requested reply block is larger than the underlying layer's PDU,
+      // we will have to wait for multiple packets. These will be sent serially, with no
+      // other interleaved requests/replies. To handle this, we need to either store the
+      // current reply context and continue it on the next callback, or invoke a sync read,
+      // since we know the next block of data is sequential.
+      // NOTE: We are trusting the server re: the data length here. If it is wrong, we will 
+      // wait forever... There is no other way to know when an operation has failed...
+      // (except the underlying protocol...)
+      // TODO: We should probably make sure the result code is success before we plan to read forever...
+      m_Pieces++;
+      if (bytesRead < m_TotalBytes)
+        XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Began receiving multi-PDU read response (expected: %d, read: %d)",m_TotalBytes, m_BytesRemaining);
+    }
+  }
+  
+  return 0;
+}
+
+int CDSIRequest::AppendResponse(CTCPPacketReader& reader)
+{
+  uint8_t* pDest = (uint8_t*)m_pResponse->GetData() + m_TotalBytes - m_BytesRemaining;
+  int bytesRead = reader.Read(pDest, m_BytesRemaining);
+  
+  if (bytesRead > 0)
+    UpdateOngoing(bytesRead);
+  
+  return bytesRead;
+}
+
+bool CDSIRequest::IsOngoing()
+{
+  // A response is ongoing if there is supposed to be a payload, and some of it remains to be read
+  return ((m_TotalBytes > 0) && (m_BytesRemaining > 0));
+}
+
+uint32_t CDSIRequest::UpdateOngoing(uint32_t bytesRead)
+{
+  m_BytesRemaining -= (bytesRead > m_BytesRemaining) ? m_BytesRemaining : bytesRead;
+  m_Pieces++;
+  return m_BytesRemaining;
+}
+
+// Sync
+//////////
+CDSISyncRequest::CDSISyncRequest(uint16_t id, CDSIBuffer* pResponseBuf/*=NULL*/) : CDSIRequest(id, pResponseBuf)
+{
+  m_pEvent = new CThreadSyncEvent();
+}
+CDSISyncRequest::~CDSISyncRequest()
+{
+  delete m_pEvent;
+}
+bool CDSISyncRequest::Wait(int timeout/*=-1*/)
+{
+  return (m_pEvent->Wait(timeout) == 0);
+}
+
+void CDSISyncRequest::Cancel(uint32_t reason)
+{
+  m_Result = reason;
+  m_pEvent->Set();    
+}
+
+void CDSISyncRequest::Complete(uint32_t result)
+{
+  m_Result = result;
+  m_pEvent->Set();
+}
+
+void CDSISyncRequest::Signal()
+{
+  m_pEvent->Set();
+}  CThreadSyncEvent* m_pEvent;
+
+// Async
+//////////
+CDSIAsyncRequest::CDSIAsyncRequest(uint16_t id, CDSIBuffer* pResponseBuf/*=NULL*/) : 
+  CDSIRequest(id, pResponseBuf) 
+{
+}
+
+CDSIAsyncRequest::~CDSIAsyncRequest()
+{
+  
+}
+
+void CDSIAsyncRequest::Cancel(uint32_t reason)
+{
+  m_Result = reason;
+}
+
+void CDSIAsyncRequest::Complete(uint32_t reason)
+{
+  m_Result = reason;
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 // DSI Session
@@ -297,24 +429,6 @@ CDSISession::~CDSISession()
   Close();
 }
 
-////TEMP
-// TODO: FIXME!
-void init_request(DSIRequest& req, CDSIBuffer* pBuf)
-{
-  req.pEvent = new CThreadSyncEvent();
-  req.pResponseBuffer = pBuf;
-  req.result = 0;
-  req.totalBytes = 0;
-  req.bytesRemaining = 0;
-  req.pieces = 0;
-}
-
-void cleanup_request(DSIRequest& req)
-{
-  delete req.pEvent;
-}
-////~TEMP
-
 bool CDSISession::Open(const char* pHostName, unsigned int port, unsigned int timeout /*=3000*/)
 {
   XAFP_LOG(XAFP_LOG_FLAG_INFO, "DSI Protocol: Opening session for %s:%d", pHostName, port);
@@ -331,18 +445,16 @@ bool CDSISession::Open(const char* pHostName, unsigned int port, unsigned int ti
   reqBuf.Write((uint32_t)1024); // Option Value
   
   // Add Request to map so receive handler can notify us
-  DSIRequest request;
   CDSIBuffer response; // TODO: Remove this once the handler is able to ignore payloads
-  request.id = GetNewRequestId();
-  init_request(request, &response);
-  AddRequest(&request);
+  CDSISyncRequest req(GetNewRequestId(), &response);
+  AddRequest(&req);
 
-  int err = SendMessage(DSIOpenSession, request.id, &reqBuf); // Report's its own errors
+  int err = SendMessage(DSIOpenSession, req.GetId(), &reqBuf); // Report's its own errors
   if (!err)
   {
     // The request went out, now wait for a reply
-    request.pEvent->Wait();
-    err = request.result;
+    req.Wait();
+    err = req.GetResult();
     if (!err)
     {
       XAFP_LOG(XAFP_LOG_FLAG_INFO, "DSI Protocol: Opened session for %s:%d", pHostName, port);
@@ -364,8 +476,6 @@ bool CDSISession::Open(const char* pHostName, unsigned int port, unsigned int ti
   {
     XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: An error occurred while sending session request to %s:%d. Error: %d", pHostName, port, err);
   }
-  
-  cleanup_request(request);
   
   return (!err);
 }
@@ -389,36 +499,34 @@ int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=N
     return kDSISessionClosed;
   }
   
+  CDSISyncRequest req(GetNewRequestId(), pResponse);
   // Add Request to map so receive handler can notify us
-  DSIRequest request;
-  init_request(request, pResponse);
-  request.id = GetNewRequestId();
-  AddRequest(&request);
+  AddRequest(&req);
   
   // TODO: This is a messy way to get the AFP command Id...
-  XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), request.id);
+  XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), req.GetId());
 
   int err = kNoError;
   if (writeOffset)
   {
-    err = SendMessage(DSIWrite, request.id, &payload, writeOffset);
+    err = SendMessage(DSIWrite, req.GetId(), &payload, writeOffset);
   }
   else
   {
-    err = SendMessage(DSICommand, request.id, &payload);
+    err = SendMessage(DSICommand, req.GetId(), &payload);
   }
   if (!err)
   {
     // The DSICommand message always expects a response, even if the caller does not (no return payload)
-    request.pEvent->Wait();
-    err = request.result; // Let the caller report this if they want to...
+    req.Wait();
+    err = req.GetResult(); // Let the caller report this if they want to...
   }
   else
   {
     // TODO: This is a messy way to get the AFP command Id...
-    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Failed to send command (%s), requestId: %d, result: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), request.id, err);
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Failed to send command (%s), requestId: %d, result: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), req.GetId(), err);
   }
-  cleanup_request(request);
+//  cleanup_request(request);
   
   return err;
 }
@@ -445,16 +553,12 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
   // TODO: Should we time out after some period...?
   if (m_pOngoingReply) // Do we have a previously-incomplete reply block?
   {
+    int err = kNoError;
     // Continue working on the incomplete read...
-    m_pOngoingReply->pieces++;
-    CDSIBuffer* pBuffer = m_pOngoingReply->pResponseBuffer;
-    uint8_t* pDest = (uint8_t*)pBuffer->GetData() + m_pOngoingReply->totalBytes - m_pOngoingReply->bytesRemaining;
-    int bytesRead = reader.Read(pDest, m_pOngoingReply->bytesRemaining);
-    
+    int bytesRead = m_pOngoingReply->AppendResponse(reader);    
     if (bytesRead > 0) // All OK
     {
-      m_pOngoingReply->bytesRemaining -= bytesRead;
-      if (m_pOngoingReply->bytesRemaining) // Not quite done yet...
+      if (m_pOngoingReply->GetBytesRemaining()) // Not quite done yet...
         return; // Wait some more
     }
     else if(!bytesRead)
@@ -464,12 +568,12 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
     else
     {
       XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Unable to read response - Error: %d", bytesRead);
-      m_pOngoingReply->result = kTCPReceiveError;
+      err = kTCPReceiveError;
     }
     
     // We either completed the reply block, or an error occurred. Signal waiting caller
-    XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Finished receiving multi-PDU read response (expected: %d, read: %d, pieces: %d)",m_pOngoingReply->totalBytes, m_pOngoingReply->totalBytes - m_pOngoingReply->bytesRemaining, m_pOngoingReply->pieces);
-    m_pOngoingReply->pEvent->Set();    
+    XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Finished receiving multi-PDU read response (expected: %d, read: %d, pieces: %d)",m_pOngoingReply->GetTotalBytes(), m_pOngoingReply->GetTotalBytes() - m_pOngoingReply->GetBytesRemaining(), m_pOngoingReply->GetPieces());
+    m_pOngoingReply->Complete(err); 
     m_pOngoingReply = NULL;
     return;
   }
@@ -528,8 +632,7 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
     }
     else // This is a reply to a previously-sent message
     {
-      DSIRequest* pRequest = NULL;
-      CDSIBuffer* pBuffer = NULL;
+      CDSIRequest* pRequest = NULL;
       
       switch (hdr.command)
       {
@@ -548,47 +651,18 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
           pRequest = RemoveRequest(hdr.requestID);
           if (pRequest)
           {
-            pBuffer = pRequest->pResponseBuffer;
-            // TODO: Handle case where we don't find what we expected (maybe client timed-out...) - another use for buffer 'skip' code
-            
-            // Store the result code
-            pRequest->result = hdr.errorCode;
-            
             // Tranfer data into caller-supplied buffer, if one was provided
             // If not, they did not expect any data back, just a result code
             // TODO: Make sure all data in the message is read/skipped before moving on, to prevent 
-            // clogging-up the pipe...s
-            if (hdr.totalDataLength && pBuffer)
+            // clogging-up the pipe...
+            pRequest->SaveResponse(reader, hdr.totalDataLength);
+            if (pRequest->IsOngoing())
             {
-              pBuffer->Resize(hdr.totalDataLength); // Make sure we have somewhere to put the data (including possible ongoing reads)
-              int bytesRead = reader.Read(pBuffer->GetData(), hdr.totalDataLength);
-              if (bytesRead > 0) // All OK
-              {  
-                pBuffer->SetDataLen(pBuffer->GetDataLen() + bytesRead); // Size so far (might not be final size)
-                
-                // If the requested reply block is larger than the underlying layer's PDU,
-                // we will have to wait for multiple packets. These will be sent serially, with no
-                // other interleaved requests/replies. To handle this, we need to either store the
-                // current reply context and continue it on the next callback, or invoke a sync read,
-                // since we know the next block of data is sequential.
-                // NOTE: We are trusting the server re: the data length here. If it is wrong, we will 
-                // wait forever... There is no other way to know when an operation has failed...
-                // (except the underlying protocol...)
-                // TODO: We should probably make sure the result code is success before we plan to read forever...
-                if (bytesRead < hdr.totalDataLength)
-                {
-                  // Setup and store the request context
-                  pRequest->totalBytes = hdr.totalDataLength;
-                  pRequest->bytesRemaining = hdr.totalDataLength - bytesRead;
-                  pRequest->pieces = 1;
-                  XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Began receiving multi-PDU read response (expected: %d, read: %d)",pRequest->totalBytes, pRequest->bytesRemaining);
-                  m_pOngoingReply = pRequest; 
-                  return; // Wait for more data before signaling requestor...
-                }
-              }
+              m_pOngoingReply = pRequest; 
+              return; // Wait for more data before signaling requestor...
             }
             // Signal waiting requestor
-            pRequest->pEvent->Set();
+            pRequest->Complete(hdr.errorCode);
           }
           else
           {
@@ -612,17 +686,17 @@ void CDSISession::OnAttention(uint16_t attData)
   XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: ATTENTION!!");
 }
 
-bool CDSISession::AddRequest(DSIRequest* pRequest)
+bool CDSISession::AddRequest(CDSIRequest* pRequest)
 {
   // TODO: Add to request map...error if duplicate id
-  m_Requests[pRequest->id] = pRequest;
+  m_Requests[pRequest->GetId()] = pRequest;
   return true;
 }
 
-DSIRequest* CDSISession::RemoveRequest(uint16_t id)
+CDSIRequest* CDSISession::RemoveRequest(uint16_t id)
 {
   // TODO: look in request map
-  DSIRequest* pReq = m_Requests[id];
+  CDSIRequest* pReq = m_Requests[id];
   m_Requests.erase(id);
   return pReq;
 }
@@ -632,10 +706,11 @@ void CDSISession::SignalAll(int err)
   XAFP_LOG(XAFP_LOG_FLAG_INFO, "DSI Protocol: Signaling %d waiting callers", m_Requests.size());
 
   // TODO: Prevent anyone from adding to the map while we iterate
-  std::map<int, DSIRequest*>::iterator it;
+  std::map<int, CDSIRequest*>::iterator it;
   for (it = m_Requests.begin(); it != m_Requests.end(); it++)
   {
-    (*it).second->pEvent->Set();
+    // TODO: Add error code
+    (*it).second->Cancel(1);
   }
 }
 

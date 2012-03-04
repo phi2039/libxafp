@@ -451,7 +451,8 @@ int CAFPSession::Stat(int volumeId, const char* pPathSpec, CNodeParams** pParams
     }
     return 0; 
   }
-  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Stat %s (error=%d)", pPathSpec, err);
+  if (err != kFPObjectNotFound)
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Stat %s (error=%d)", pPathSpec, err);
 
   return -1; // TODO: Need error codes for callers...  
 }
@@ -557,7 +558,7 @@ int CAFPSession::Delete(int volumeId, const char* pPathSpec, int refId /*=2*/)
   reqBuf.WritePathSpec(pPathSpec, len);
   
   int32_t err = SendCommand(reqBuf);
-  if (err != kNoError)
+  if ((err != kNoError) && (err != kFPObjectNotFound))
     XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Failed to Delete %s (error=%d)", pPathSpec, err);
     
   return err;

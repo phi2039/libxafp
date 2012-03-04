@@ -42,3 +42,23 @@ class CAFPPath
 public:
 protected:
 };
+
+// Functor implementation
+template <class P> class TFunctor
+{
+public:
+  virtual void operator ()(P p) = 0;
+  virtual void Call(P p) = 0;
+};
+
+template <class T, class P> class TCallbackFunctor : public TFunctor<P>
+{
+public:
+  TCallbackFunctor(T* pInstance, void(T::*func)(P)) : m_pInstance(pInstance), m_Func(func) {};
+  virtual void operator ()(P p) {(*m_pInstance.*m_Func)(p);}
+  virtual void Call(P p) {(*m_pInstance.*m_Func)(p);}
+private:
+  void (T::*m_Func)(P);
+  T* m_pInstance;
+};
+
