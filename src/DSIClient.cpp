@@ -31,8 +31,6 @@
 // - Is there a deadlock in here someplace...?
 // - Handle server options in DSIOpenSession
 
-
-
 /////////////////////////////////////////////////////////////////////////////////
 // DSI Buffer
 /////////////////////////////////////////////////////////////////////////////////
@@ -563,7 +561,12 @@ int32_t CDSISession::SendCommandAsync(CDSIBuffer& payload, CDSIAsyncCallback* pC
   
   // Async Request handling
   CDSIAsyncRequest* pReq =  new CDSIAsyncRequest(GetNewRequestId(), pCallback); // This object will self-destruct upon completion
-  AddRequest(pReq); // Add Request to map so receive handler can notify us (do this before calling SendMessage, to make sure it is there in time)
+  if (!AddRequest(pReq)) // Add Request to map so receive handler can notify us (do this before calling SendMessage, to make sure it is there in time)
+  {
+    // This really should not happen...ever
+    delete pReq;
+    return kFPParamErr;
+  }
   
   // TODO: This is a messy way to get the AFP command Id...
   XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending async command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), pReq->GetId());
@@ -585,10 +588,6 @@ int32_t CDSISession::SendCommandAsync(CDSIBuffer& payload, CDSIAsyncCallback* pC
   }
   return err;
 }
-
-
-// TODO: Make this an inline member
-
 
 // Async Read callback
 // TODO: Should we add a 'hint' here to let the reader know that we are waiting for
@@ -735,19 +734,26 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
 
 void CDSISession::OnAttention(uint16_t attData)
 {
-  XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "DSI Protocol: ATTENTION!!");
+  // Do nothing. Default implementation.
 }
 
 bool CDSISession::AddRequest(CDSIRequest* pRequest)
 {
-  // TODO: Add to request map...error if duplicate id
-  m_Requests[pRequest->GetId()] = pRequest;
-  return true;
+  // TODO: Prevent anyone from changing the map while we use it
+  uint16_t id = pRequest->GetId();
+  if (m_Requests.find(id) == m_Requests.end())
+  {
+    m_Requests[pRequest->GetId()] = pRequest;
+    return true;
+  }
+  // This should only happen if the id-generation code is broken...
+  XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Received request with duplicate id [%d]. Ignoring this request.", id);
+  return false;
 }
 
 CDSIRequest* CDSISession::RemoveRequest(uint16_t id)
 {
-  // TODO: look in request map
+  // TODO: Prevent anyone from changing the map while we use it
   CDSIRequest* pReq = m_Requests[id];
   m_Requests.erase(id);
   return pReq;
