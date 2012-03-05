@@ -21,6 +21,7 @@
  */
 
 #include "Threads.h"
+#include "Utils.h"
 #include "TCPClient.h"
 #include <map>
 
@@ -64,6 +65,13 @@ struct DSIHeader
   uint32_t reserved;
 };
 
+inline void translate_header(DSIHeader& hdr)
+{
+  hdr.requestID = ntohs(hdr.requestID);
+  hdr.writeOffset = ntohl(hdr.writeOffset);
+  hdr.totalDataLength = ntohl(hdr.totalDataLength);
+}
+
 class CDSIBuffer
 {
 public:
@@ -105,6 +113,14 @@ protected:
   
   const uint32_t m_HeadRoom;
 };
+
+struct DSIAsyncResult
+{
+  int32_t err;
+  CDSIBuffer* pResponse;
+};
+
+typedef TFunctor<DSIAsyncResult*> CDSIAsyncCallback;
 
 class CDSIRequest
 {
@@ -149,7 +165,7 @@ class CDSISyncRequest : public CDSIRequest
 public:
   CDSISyncRequest(uint16_t id, CDSIBuffer* pResponseBuf=NULL);
   virtual ~CDSISyncRequest();
-  bool Wait(int timeout=-1);
+  int Wait(int timeout=-1);
   
   virtual void Cancel(uint32_t reason);
   virtual void Complete(uint32_t result);
@@ -162,13 +178,15 @@ protected:
 class CDSIAsyncRequest : public CDSIRequest
 {
 public:
-  CDSIAsyncRequest(uint16_t id, CDSIBuffer* pResponseBuf=NULL);
+  CDSIAsyncRequest(uint16_t id, CDSIAsyncCallback* pCallback);
   virtual ~CDSIAsyncRequest();
 
   virtual void Cancel(uint32_t reason);
   virtual void Complete(uint32_t reason);
   
 protected:
+  CDSIAsyncCallback* m_pCallback;
+  CDSIBuffer m_Buffer;
 };
 
 
@@ -186,9 +204,10 @@ public:
   uint16_t GetNewRequestId(){return m_LastRequestId++;}
   
   int32_t SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse = NULL, uint32_t writeOffset = 0);
+  int32_t SendCommandAsync(CDSIBuffer& payload, CDSIAsyncCallback* pCallback, uint32_t writeOffset = 0);
   
   // ITCPReceiveCallback Implementation
-  void OnReceive(CTCPPacketReader& reader); 
+  void OnReceive(CTCPPacketReader& reader);
   
 protected:
   int32_t SendMessage(uint8_t messageId, uint16_t requestId, CDSIBuffer* pPayload = NULL, uint32_t writeOffset = 0);

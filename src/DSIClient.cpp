@@ -369,9 +369,14 @@ CDSISyncRequest::~CDSISyncRequest()
 {
   delete m_pEvent;
 }
-bool CDSISyncRequest::Wait(int timeout/*=-1*/)
+
+int CDSISyncRequest::Wait(int timeout/*=-1*/)
 {
-  return (m_pEvent->Wait(timeout) == 0);
+  // TODO: Implement error code for timeout
+  if (m_pEvent->Wait(timeout))
+    return -1; // The call timed-out
+  
+  return m_Result;
 }
 
 void CDSISyncRequest::Cancel(uint32_t reason)
@@ -379,7 +384,6 @@ void CDSISyncRequest::Cancel(uint32_t reason)
   m_Result = reason;
   m_pEvent->Set();    
 }
-
 void CDSISyncRequest::Complete(uint32_t result)
 {
   m_Result = result;
@@ -393,14 +397,15 @@ void CDSISyncRequest::Signal()
 
 // Async
 //////////
-CDSIAsyncRequest::CDSIAsyncRequest(uint16_t id, CDSIBuffer* pResponseBuf/*=NULL*/) : 
-  CDSIRequest(id, pResponseBuf) 
+CDSIAsyncRequest::CDSIAsyncRequest(uint16_t id, CDSIAsyncCallback* pCallback) : 
+  CDSIRequest(id, &m_Buffer),
+  m_pCallback(pCallback)
 {
 }
 
 CDSIAsyncRequest::~CDSIAsyncRequest()
 {
-  
+  delete m_pCallback;  
 }
 
 void CDSIAsyncRequest::Cancel(uint32_t reason)
@@ -408,9 +413,20 @@ void CDSIAsyncRequest::Cancel(uint32_t reason)
   m_Result = reason;
 }
 
-void CDSIAsyncRequest::Complete(uint32_t reason)
+void CDSIAsyncRequest::Complete(uint32_t result)
 {
-  m_Result = reason;
+  if (!m_pCallback)
+    return;
+  
+  m_Result = result;
+
+  DSIAsyncResult res;
+  res.err = result;
+  res.pResponse = m_pResponse;
+  m_pCallback->Call(&res);
+
+  // Self-destruct
+  delete this;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -453,8 +469,7 @@ bool CDSISession::Open(const char* pHostName, unsigned int port, unsigned int ti
   if (!err)
   {
     // The request went out, now wait for a reply
-    req.Wait();
-    err = req.GetResult();
+    err = req.Wait();
     if (!err)
     {
       XAFP_LOG(XAFP_LOG_FLAG_INFO, "DSI Protocol: Opened session for %s:%d", pHostName, port);
@@ -499,9 +514,9 @@ int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=N
     return kDSISessionClosed;
   }
   
+// Sync Request handling  
   CDSISyncRequest req(GetNewRequestId(), pResponse);
-  // Add Request to map so receive handler can notify us
-  AddRequest(&req);
+  AddRequest(&req); // Add Request to map so receive handler can notify us
   
   // TODO: This is a messy way to get the AFP command Id...
   XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), req.GetId());
@@ -515,29 +530,65 @@ int32_t CDSISession::SendCommand(CDSIBuffer& payload, CDSIBuffer* pResponse /*=N
   {
     err = SendMessage(DSICommand, req.GetId(), &payload);
   }
+  
   if (!err)
   {
     // The DSICommand message always expects a response, even if the caller does not (no return payload)
-    req.Wait();
-    err = req.GetResult(); // Let the caller report this if they want to...
+    // Wait for the response and return the result to the caller
+    return req.Wait();
   }
   else
   {
     // TODO: This is a messy way to get the AFP command Id...
     XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Failed to send command (%s), requestId: %d, result: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), req.GetId(), err);
   }
-//  cleanup_request(request);
   
   return err;
 }
 
-// TODO: Make this an inline member
-void translate_header(DSIHeader& hdr)
+int32_t CDSISession::SendCommandAsync(CDSIBuffer& payload, CDSIAsyncCallback* pCallback, uint32_t writeOffset /*=0*/)
 {
-  hdr.requestID = ntohs(hdr.requestID);
-  hdr.writeOffset = ntohl(hdr.writeOffset);
-  hdr.totalDataLength = ntohl(hdr.totalDataLength);
+  if (!IsOpen())
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Attempting to use closed session");
+    return kDSISessionClosed;
+  }
+  
+  // The DSICommand message always expects a response, even if the caller does not (no return payload)
+  if (!pCallback)
+  {
+    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Invalid callback passed to SendCommandAsync()");
+    return kFPParamErr;
+  }
+  
+  // Async Request handling
+  CDSIAsyncRequest* pReq =  new CDSIAsyncRequest(GetNewRequestId(), pCallback); // This object will self-destruct upon completion
+  AddRequest(pReq); // Add Request to map so receive handler can notify us (do this before calling SendMessage, to make sure it is there in time)
+  
+  // TODO: This is a messy way to get the AFP command Id...
+  XAFP_LOG(XAFP_LOG_FLAG_DSI_PROTO, "DSI Protocol: Sending async command (%s), requestId: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), pReq->GetId());
+  
+  int err = kNoError;
+  if (writeOffset)
+  {
+    err = SendMessage(DSIWrite, pReq->GetId(), &payload, writeOffset);
+  }
+  else
+  {
+    err = SendMessage(DSICommand, pReq->GetId(), &payload);
+  }
+  
+  if (err)
+  {
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "DSI Protocol: Failed to send async command (%s), requestId: %d, result: %d", AFPProtoCommandToString(*((uint8_t*)payload.GetData())), pReq->GetId(), err);
+    delete pReq; // This will also clean-up the callback (closure) object
+  }
+  return err;
 }
+
+
+// TODO: Make this an inline member
+
 
 // Async Read callback
 // TODO: Should we add a 'hint' here to let the reader know that we are waiting for
@@ -545,7 +596,7 @@ void translate_header(DSIHeader& hdr)
 void CDSISession::OnReceive(CTCPPacketReader& reader)
 {
   DSIHeader hdr;  
-  // Technically, we should be locking more in here, but we know that there is only one read thread, so 
+  // Technically, we should probably be locking more in here, but we know that there is only one read thread, so 
   // there will never be concurrent calls into this method...
   
   // Ongoing Reply...
@@ -662,6 +713,7 @@ void CDSISession::OnReceive(CTCPPacketReader& reader)
               return; // Wait for more data before signaling requestor...
             }
             // Signal waiting requestor
+            // NOTE: This object may self-destruct (or go out of scope) immediately. Do not use the reference again after calling 'Complete'
             pRequest->Complete(hdr.errorCode);
           }
           else

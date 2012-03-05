@@ -214,8 +214,11 @@ bool CAFPSession::GetVolumeList(AFPServerVolumeList& list, bool reload/*=false*/
 
 void CAFPSession::OnAttention(uint16_t attData)
 {
+  // The server sent us an 'Attention' message. Handle it.
+  // TODO: Handle instances where the server is shutting down...
+  
   // If there is a message waiting for us, get it...
-  // TODO: Implement async response handling (completion proc) for this to work...
+  // This must be done asynchronously, since new synchronous requests cannot be made from within a callback
   if (kMsgNotifyMask & attData)
   {
     CDSIBuffer reqBuf(6);
@@ -223,10 +226,37 @@ void CAFPSession::OnAttention(uint16_t attData)
     reqBuf.Write((uint8_t)0); // Pad
     reqBuf.Write((uint16_t)1); // Server Message
     reqBuf.Write((uint16_t)0x3); // Request | Supports UTF-8
-    SendMessage(DSICommand, GetNewRequestId(), &reqBuf);
+    SendCommandAsync(reqBuf, new CAFPAsyncCallback(this, &CAFPSession::OnServerMessage)); // The callee will clean-up the callback object
 
-    XAFP_LOG_0(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Retrieved server message [STUB - REQUIRES ASYNC I/O!]");
+    XAFP_LOG_0(XAFP_LOG_FLAG_INFO, "AFP Protocol: Retrieving server message...");
   }
+}
+
+void CAFPSession::OnServerMessage(DSIAsyncResult* pResult)
+{
+  if (pResult->err)
+  {
+    XAFP_LOG(XAFP_LOG_FLAG_ERROR, "AFP Protocol: Falied to retrieve server message. error: %d", pResult->err);
+    return;
+  }
+  
+  CDSIBuffer* pBuffer = pResult->pResponse;
+  
+  pBuffer->Read16(); // Message type (always 'Server')
+  int16_t bitmap = pBuffer->Read16();
+  uint16_t len = 0;
+  if (bitmap & 0x2) // UTF-8 String
+    len = pBuffer->Read16();
+  else
+    len = pBuffer->Read8();
+  
+  char* pBuf = (char*)malloc(len);
+  pBuffer->Read(pBuf, len);
+  pBuf[len] = '\0';
+  
+  XAFP_LOG(XAFP_LOG_FLAG_INFO, "AFP Protocol: Retrieved server message [%s]", pBuf);
+  
+  free (pBuf);
 }
 
 int CAFPSession::OpenVolume(const char* pVolName)

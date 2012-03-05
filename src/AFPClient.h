@@ -106,6 +106,7 @@ public:
   int Stat(int volumeId, const char* pPathSpec, CNodeParams** ppParams, int refId = 2);
   int Exists(int volumeId, const char* pPathSpec, int refId) {return Stat(volumeId, pPathSpec, NULL, refId);}
   
+  void OnServerMessage(DSIAsyncResult* pResult);
 protected:
   bool LoginDHX2(const char* pUsername, const char* pPassword);
   bool LoginClearText(CAFPCleartextAuthInfo* authInfo);
@@ -124,3 +125,5 @@ protected:
   std::map<std::string, int> m_MountedVolumes;
   
 };
+
+typedef TCallbackFunctor<CAFPSession, DSIAsyncResult*> CAFPAsyncCallback;
